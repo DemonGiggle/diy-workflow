@@ -18,7 +18,18 @@ This runs:
 
 - TypeScript build
 - production UI build into `web-dist/`
-- node:test coverage for workflow behavior, server API, editor model wiring, mock mode, and localization
+- node:test coverage for action units, reference resolution, workflow behavior, CLI flows, launched server integration, server API, editor model wiring, mock mode, and localization
+
+## Test Layers
+
+The test suite intentionally covers several layers:
+
+- action unit tests for each built-in action's real and mock behavior
+- reference resolver tests for whole-value and inline references
+- workflow integration tests for validation, execution, fanout/fanin, and trace output
+- CLI integration tests for `validate`, `run`, `runs list`, and `runs show`
+- launched server integration tests that spawn `diy-workflow serve` and call static UI and workflow API endpoints
+- UI model/i18n tests for editor wiring and localization coverage
 
 ## Run The CLI
 
