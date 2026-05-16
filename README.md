@@ -46,6 +46,8 @@ Execution traces are written to `runs/run_xxxx/trace.json`.
 
 ## Visual editor
 
+![Visual workflow editor with LLM action](docs/editor-llm-example.png)
+
 Build the UI before serving:
 
 ```sh
@@ -91,6 +93,15 @@ steps:
       maxSentences: 2
 ```
 
+An LLM-oriented workflow is also available:
+
+```sh
+node dist/cli.js validate examples/llm-review.yaml
+node dist/cli.js run examples/llm-review.yaml
+```
+
+It reads requirements from `examples/input.txt`, sends them through `llm.prompt`, summarizes the generated plan with `llm.summarize`, and checks the summary with `eval.exact_match`.
+
 ## Architecture
 
 - `ActionDefinition`: reusable typed building block with `type`, input schema, output schema, optional config schema, and `run(input, context)`.
@@ -109,4 +120,3 @@ Built-in actions:
 - `control.fanout`
 - `control.fanin`
 - `eval.exact_match`
-

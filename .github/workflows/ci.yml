@@ -35,3 +35,4 @@ jobs:
         run: |
           node dist/cli.js validate examples/summarize.yaml
           node dist/cli.js validate examples/fanout.yaml
+          node dist/cli.js validate examples/llm-review.yaml

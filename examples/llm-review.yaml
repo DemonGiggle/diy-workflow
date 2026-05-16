@@ -1,0 +1,33 @@
+name: llm-review
+steps:
+  - id: read_requirements
+    type: io.read_file
+    input:
+      path: input.txt
+
+  - id: draft_response
+    type: llm.prompt
+    input:
+      prompt: |
+        Review the following workflow requirements and write a concise implementation plan.
+
+        Requirements:
+        {{steps.read_requirements.output.content}}
+    config:
+      mockResponse: |
+        1. Parse the workflow into typed steps.
+        2. Validate action schemas and references before execution.
+        3. Execute steps in order and persist a trace.
+
+  - id: summarize_plan
+    type: llm.summarize
+    input:
+      text: "{{steps.draft_response.output.text}}"
+    config:
+      maxSentences: 2
+
+  - id: verify_summary
+    type: eval.exact_match
+    input:
+      actual: "{{steps.summarize_plan.output.summary}}"
+      expected: "1. Parse the workflow into typed steps."
