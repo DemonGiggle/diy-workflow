@@ -11,6 +11,8 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
 .topbar-actions { display: flex; gap: 10px; }
 .topbar button, .danger { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; border-radius: 6px; background: #1f6feb; color: #fff; font-weight: 650; }
 .topbar button.secondary, .secondary { background: #eef2f7; color: #1d2430; }
+.locale-picker { display: flex; grid-template-columns: none; align-items: center; gap: 7px; color: #4b5565; font-size: 12px; }
+.locale-picker select { height: 36px; min-width: 128px; padding: 0 30px 0 10px; }
 .workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 280px minmax(520px, 1fr) 390px; }
 .palette, .side-panel { min-height: calc(100vh - 68px); overflow: auto; background: #ffffff; border-right: 1px solid #d9dee7; padding: 16px; }
 .side-panel { border-right: 0; border-left: 1px solid #d9dee7; display: flex; flex-direction: column; gap: 14px; }
@@ -72,6 +74,8 @@ textarea { min-height: 82px; resize: vertical; line-height: 1.4; }
   .app-shell { overflow-x: hidden; }
   .topbar { width: 100vw; height: auto; min-height: 68px; align-items: flex-start; gap: 12px; padding: 12px 14px; flex-wrap: wrap; }
   .topbar-actions { width: calc(100vw - 28px); max-width: calc(100vw - 28px); }
+  .locale-picker { flex: 1 1 100%; }
+  .locale-picker select { flex: 1; }
   .topbar button { flex: 1 1 0; justify-content: center; min-width: 0; padding: 0 8px; white-space: nowrap; }
   .workspace { display: flex; flex-direction: column; }
   .palette, .side-panel { min-height: auto; border: 0; border-bottom: 1px solid #d9dee7; }

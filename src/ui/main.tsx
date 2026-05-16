@@ -20,29 +20,38 @@ import {
 } from "./editorModel.js";
 import { listRuns, runWorkflow, showRun } from "./apiClient.js";
 import type { OutputDescriptor } from "./actionCatalog.js";
+import { createTranslator, isLocale, localeOptions, localizeAction, localizeActions, type Locale } from "./i18n.js";
 import "./styles.css";
+
+const localeStorageKey = "diy-workflow.locale";
 
 function App() {
   const [state, setState] = useState<EditorState>(() => createInitialEditorState());
   const [trace, setTrace] = useState<RunTrace | null>(null);
   const [runs, setRuns] = useState<string[]>([]);
-  const [statusMessage, setStatusMessage] = useState<string>("Ready");
+  const [locale, setLocale] = useState<Locale>(() => readStoredLocale());
+  const t = useMemo(() => createTranslator(locale), [locale]);
+  const [statusMessage, setStatusMessage] = useState<string>(() => t("run.ready"));
   const [isRunning, setIsRunning] = useState(false);
   const selectedStep = state.workflow.steps.find((step) => step.id === state.selectedStepId) ?? state.workflow.steps[0] ?? null;
   const yaml = useMemo(() => YAML.stringify(state.workflow), [state.workflow]);
 
   useEffect(() => {
-    void refreshRuns(setRuns, setStatusMessage);
-  }, []);
+    window.localStorage?.setItem(localeStorageKey, locale);
+  }, [locale]);
+
+  useEffect(() => {
+    void refreshRuns(setRuns, setStatusMessage, t);
+  }, [t]);
 
   async function executeWorkflow() {
     setIsRunning(true);
-    setStatusMessage("Running workflow...");
+    setStatusMessage(t("run.runningWorkflow"));
     try {
       const nextTrace = await runWorkflow(state.workflow);
       setTrace(nextTrace);
       setStatusMessage(`${nextTrace.status.toUpperCase()} ${nextTrace.runId}`);
-      await refreshRuns(setRuns, setStatusMessage, false);
+      await refreshRuns(setRuns, setStatusMessage, t, false);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -51,7 +60,7 @@ function App() {
   }
 
   async function inspectRun(runId: string) {
-    setStatusMessage(`Loading ${runId}...`);
+    setStatusMessage(t("run.loading", { runId }));
     try {
       const nextTrace = await showRun(runId);
       setTrace(nextTrace);
@@ -66,45 +75,58 @@ function App() {
       <header className="topbar">
         <div>
           <h1>diy-workflow</h1>
-          <span>Visual editor preview</span>
+          <span>{t("app.subtitle")}</span>
         </div>
         <div className="topbar-actions">
-          <button className="secondary" onClick={() => navigator.clipboard?.writeText(yaml)}><Copy size={16}/> Copy YAML</button>
-          <button onClick={executeWorkflow} disabled={isRunning}><CirclePlay size={16}/> {isRunning ? "Running" : "Run Workflow"}</button>
+          <label className="locale-picker">
+            <span>{t("locale.label")}</span>
+            <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
+              {localeOptions.map((option) => <option key={option.locale} value={option.locale}>{option.label}</option>)}
+            </select>
+          </label>
+          <button className="secondary" onClick={() => navigator.clipboard?.writeText(yaml)}><Copy size={16}/> {t("run.copyYaml")}</button>
+          <button onClick={executeWorkflow} disabled={isRunning}><CirclePlay size={16}/> {isRunning ? t("run.running") : t("run.runWorkflow")}</button>
         </div>
       </header>
 
       <section className="workspace">
-        <ActionPalette onAdd={(type) => setState((current) => addStep(current, type))} />
-        <Canvas state={state} setState={setState} />
+        <ActionPalette locale={locale} t={t} onAdd={(type) => setState((current) => addStep(current, type))} />
+        <Canvas state={state} locale={locale} t={t} setState={setState} />
         <aside className="side-panel">
-          {selectedStep ? <Inspector state={state} step={selectedStep} setState={setState} /> : <EmptyInspector />}
-          <YamlPanel yaml={yaml} />
-          <TracePanel trace={trace} runs={runs} statusMessage={statusMessage} onRefresh={() => refreshRuns(setRuns, setStatusMessage)} onShowRun={inspectRun} />
+          {selectedStep ? <Inspector state={state} step={selectedStep} locale={locale} t={t} setState={setState} /> : <EmptyInspector t={t} />}
+          <YamlPanel yaml={yaml} t={t} />
+          <TracePanel trace={trace} runs={runs} statusMessage={statusMessage} t={t} onRefresh={() => refreshRuns(setRuns, setStatusMessage, t)} onShowRun={inspectRun} />
         </aside>
       </section>
     </main>
   );
 }
 
-async function refreshRuns(setRuns: (runs: string[]) => void, setStatusMessage: (message: string) => void, reportSuccess = true): Promise<void> {
+type Translator = ReturnType<typeof createTranslator>;
+
+function readStoredLocale(): Locale {
+  const value = window.localStorage?.getItem(localeStorageKey);
+  return value && isLocale(value) ? value : "en";
+}
+
+async function refreshRuns(setRuns: (runs: string[]) => void, setStatusMessage: (message: string) => void, t: Translator, reportSuccess = true): Promise<void> {
   try {
     const nextRuns = await listRuns();
     setRuns(nextRuns);
-    if (reportSuccess) setStatusMessage(nextRuns.length ? `${nextRuns.length} saved run(s)` : "No saved runs yet");
+    if (reportSuccess) setStatusMessage(nextRuns.length ? t("run.savedRuns", { count: nextRuns.length }) : t("run.noSavedRuns"));
   } catch {
     setRuns([]);
-    setStatusMessage("Run API unavailable. Use diy-workflow serve after building the UI.");
+    setStatusMessage(t("run.unavailable"));
   }
 }
 
-function ActionPalette({ onAdd }: { onAdd: (type: string) => void }) {
-  const groups = groupActionsByNamespace(editorActions);
+function ActionPalette({ locale, t, onAdd }: { locale: Locale; t: Translator; onAdd: (type: string) => void }) {
+  const groups = groupActionsByNamespace(localizeActions(editorActions, locale));
   return (
     <aside className="palette">
       <div className="panel-heading">
         <Plus size={16}/>
-        <h2>Actions</h2>
+        <h2>{t("actions.title")}</h2>
       </div>
       {[...groups.entries()].map(([namespace, actions]) => (
         <section key={namespace} className="palette-group">
@@ -131,7 +153,7 @@ function groupActionsByNamespace(actions: EditorActionDefinition[]): Map<string,
   }, new Map<string, EditorActionDefinition[]>());
 }
 
-function Canvas({ state, setState }: { state: EditorState; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
+function Canvas({ state, locale, t, setState }: { state: EditorState; locale: Locale; t: Translator; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
   const [dragging, setDragging] = useState<{ stepId: string; dx: number; dy: number } | null>(null);
   const [linking, setLinking] = useState<{ stepId: string; field: OutputDescriptor } | null>(null);
 
@@ -150,6 +172,7 @@ function Canvas({ state, setState }: { state: EditorState; setState: React.Dispa
       <Connections state={state} />
       {state.workflow.steps.map((step, index) => {
         const action = getEditorAction(step.type);
+        const localizedAction = action ? localizeAction(action, locale) : undefined;
         const pos = state.positions[step.id] ?? { x: 80 + index * 300, y: 96 };
         return (
           <article
@@ -164,24 +187,24 @@ function Canvas({ state, setState }: { state: EditorState; setState: React.Dispa
                 event.currentTarget.setPointerCapture(event.pointerId);
                 setDragging({ stepId: step.id, dx: event.nativeEvent.offsetX, dy: event.nativeEvent.offsetY });
               }}
-              title="Drag node"
+              title={t("editor.dragNode")}
             >
               <Grip size={15}/>
             </button>
             <div className="node-index">{index + 1}</div>
-            <h3>{action?.label ?? step.type}</h3>
+            <h3>{localizedAction?.label ?? step.type}</h3>
             <code>{step.id}</code>
             <div className="node-io">
               <div>
-                <span>input</span>
-                {(action?.inputFields ?? []).map((field) => {
+                <span>{t("common.input")}</span>
+                {(localizedAction?.inputFields ?? []).map((field) => {
                   const connectable = linking && field.connectable;
                   const compatible = connectable ? field.connectable && isLinkCompatible(linking.field, field) : false;
                   return (
                     <code
                       key={field.name}
                       className={`port input-port ${connectable ? compatible ? "drop-ok" : "drop-blocked" : ""}`}
-                      title={field.connectable ? "Release an output port here to connect" : "This input is not connectable"}
+                      title={field.connectable ? t("editor.connectOutput") : t("editor.notConnectable")}
                       onPointerUp={(event) => {
                         if (!linking) return;
                         event.stopPropagation();
@@ -196,12 +219,12 @@ function Canvas({ state, setState }: { state: EditorState; setState: React.Dispa
                 })}
               </div>
               <div>
-                <span>output</span>
-                {(action?.outputFields ?? []).map((field) => (
+                <span>{t("common.output")}</span>
+                {(localizedAction?.outputFields ?? []).map((field) => (
                   <code
                     key={field.name}
                     className={`port output-port ${linking?.stepId === step.id && linking.field.name === field.name ? "linking" : ""}`}
-                    title="Drag to a compatible input port"
+                    title={t("editor.connectOutput")}
                     onPointerDown={(event) => {
                       event.stopPropagation();
                       setLinking({ stepId: step.id, field });
@@ -255,49 +278,53 @@ function portPosition(state: EditorState, stepId: string, fieldName: string, sid
   };
 }
 
-function Inspector({ state, step, setState }: { state: EditorState; step: WorkflowStep; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
+function Inspector({ state, step, locale, t, setState }: { state: EditorState; step: WorkflowStep; locale: Locale; t: Translator; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
   const action = getEditorAction(step.type);
   if (!action) return null;
+  const localizedAction = localizeAction(action, locale);
   return (
     <section className="inspector">
       <div className="panel-heading">
         <FileCode2 size={16}/>
-        <h2>{action.label}</h2>
+        <h2>{localizedAction.label}</h2>
       </div>
       <div className="step-meta">
-        <label>Step id<input value={step.id} readOnly /></label>
-        <label>Type<input value={step.type} readOnly /></label>
+        <label>{t("step.id")}<input value={step.id} readOnly /></label>
+        <label>{t("common.type")}<input value={step.type} readOnly /></label>
       </div>
-      <h3>Inputs</h3>
-      {action.inputFields.map((field) => (
+      <h3>{t("common.inputs")}</h3>
+      {localizedAction.inputFields.map((field) => (
         <FieldEditor
           key={field.name}
           field={field}
+          t={t}
           value={readField(step.input, field.name)}
           connections={availableConnections(state, step.id, field)}
           onChange={(value) => setState((current) => updateStepInput(current, step.id, field.name, value))}
           onConnect={(sourceStep, sourceField) => setState((current) => connectField(current, step.id, field.name, sourceStep, sourceField))}
         />
       ))}
-      {action.configFields.length > 0 && <h3>Config</h3>}
-      {action.configFields.map((field) => (
+      {localizedAction.configFields.length > 0 && <h3>{t("common.config")}</h3>}
+      {localizedAction.configFields.map((field) => (
         <FieldEditor
           key={field.name}
           field={field}
+          t={t}
           value={readField(step.config, field.name)}
           connections={[]}
           onChange={(value) => setState((current) => updateStepConfig(current, step.id, field.name, value))}
         />
       ))}
-      <h3>Outputs</h3>
-      <div className="output-list">{action.outputFields.map((field) => <code key={field.name}>{field.name}<span>{field.kind}</span></code>)}</div>
-      <button className="danger" onClick={() => setState((current) => removeStep(current, step.id))}><Trash2 size={15}/> Delete step</button>
+      <h3>{t("common.outputs")}</h3>
+      <div className="output-list">{localizedAction.outputFields.map((field) => <code key={field.name}>{field.label}<span>{field.name} · {field.kind}</span></code>)}</div>
+      <button className="danger" onClick={() => setState((current) => removeStep(current, step.id))}><Trash2 size={15}/> {t("step.delete")}</button>
     </section>
   );
 }
 
-function FieldEditor({ field, value, connections, onChange, onConnect }: {
+function FieldEditor({ field, t, value, connections, onChange, onConnect }: {
   field: FieldDescriptor;
+  t: Translator;
   value: unknown;
   connections: Array<{ fromStepId: string; field: { name: string; kind: string }; reference: string }>;
   onChange: (value: unknown) => void;
@@ -305,7 +332,7 @@ function FieldEditor({ field, value, connections, onChange, onConnect }: {
 }) {
   return (
     <label className="field-editor">
-      <span>{field.label}{field.required ? " *" : ""}</span>
+      <span>{field.label}{field.required ? t("field.requiredSuffix") : ""}</span>
       {field.kind === "textarea" ? (
         <textarea value={stringValue(value)} placeholder={field.placeholder} onChange={(event) => onChange(event.target.value)} />
       ) : field.kind === "boolean" ? (
@@ -323,7 +350,7 @@ function FieldEditor({ field, value, connections, onChange, onConnect }: {
           if (stepId && outputField) onConnect?.(stepId, outputField);
           event.currentTarget.value = "";
         }}>
-          <option value="">Connect upstream output...</option>
+          <option value="">{t("editor.connectOutput")}</option>
           {connections.map((connection) => (
             <option key={connection.reference} value={`${connection.fromStepId}:${connection.field.name}`}>
               {connection.fromStepId}.{connection.field.name} ({connection.field.kind})
@@ -335,26 +362,27 @@ function FieldEditor({ field, value, connections, onChange, onConnect }: {
   );
 }
 
-function YamlPanel({ yaml }: { yaml: string }) {
-  return <section className="yaml-panel"><h2>YAML</h2><pre>{yaml}</pre></section>;
+function YamlPanel({ yaml, t }: { yaml: string; t: Translator }) {
+  return <section className="yaml-panel"><h2>{t("yaml.title")}</h2><pre>{yaml}</pre></section>;
 }
 
-function TracePanel({ trace, runs, statusMessage, onRefresh, onShowRun }: {
+function TracePanel({ trace, runs, statusMessage, t, onRefresh, onShowRun }: {
   trace: RunTrace | null;
   runs: string[];
   statusMessage: string;
+  t: Translator;
   onRefresh: () => void;
   onShowRun: (runId: string) => void;
 }) {
   return (
     <section className="trace-panel">
-      <div className="panel-heading"><Cable size={16}/><h2>Runs</h2></div>
+      <div className="panel-heading"><Cable size={16}/><h2>{t("run.title")}</h2></div>
       <p className="muted">{statusMessage}</p>
       <div className="run-list">
-        <button className="secondary small" onClick={onRefresh}>Refresh</button>
+        <button className="secondary small" onClick={onRefresh}>{t("run.refresh")}</button>
         {runs.map((runId) => <button key={runId} className="run-pill" onClick={() => onShowRun(runId)}>{runId}</button>)}
       </div>
-      {!trace ? <p className="muted">Run the workflow or select a saved run to inspect step status, outputs, errors, and metrics.</p> : (
+      {!trace ? <p className="muted">{t("run.inspectHint")}</p> : (
         <>
           <h3>{trace.runId} · {trace.status}</h3>
           {trace.steps.map((step) => (
@@ -369,8 +397,8 @@ function TracePanel({ trace, runs, statusMessage, onRefresh, onShowRun }: {
   );
 }
 
-function EmptyInspector() {
-  return <section className="inspector"><p className="muted">Select a node to edit inputs, config, and connections.</p></section>;
+function EmptyInspector({ t }: { t: Translator }) {
+  return <section className="inspector"><p className="muted">{t("editor.noSelection")}</p></section>;
 }
 
 function readField(value: unknown, field: string): unknown {

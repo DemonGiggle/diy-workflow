@@ -12,6 +12,7 @@ The MVP is CLI-first, but it also includes a visual editor foundation for buildi
 - Validates workflow shape, unique step ids, action types, references, and schemas before execution.
 - Executes workflows and writes traces under `runs/run_xxxx/trace.json`.
 - Provides a visual editor for adding actions, editing inputs/config, wiring typed ports, running workflows, and inspecting saved traces.
+- Supports localized editor chrome and action labels for English and Traditional Chinese.
 
 ## Install
 
@@ -129,6 +130,12 @@ node dist/cli.js run examples/mock-e2e.yaml
 
 The editor exposes each action's mock settings in the config panel, including a checkbox for `mock.enabled`.
 
+## Localization
+
+The visual editor ships with English and Traditional Chinese locales. The language selector changes editor chrome, action labels, descriptions, field labels, and placeholders while preserving workflow contracts such as action `type`, step ids, YAML keys, and references.
+
+Locale resources live in `src/ui/i18n.ts`. To add another language, append the locale to `supportedLocales` and provide matching UI/action translations; the i18n tests verify every editor action and field has localized text.
+
 ## Architecture
 
 - `ActionDefinition`: reusable typed building block with `type`, input schema, output schema, optional config schema, and `run(input, context)`.
@@ -137,7 +144,7 @@ The editor exposes each action's mock settings in the config panel, including a 
 - `WorkflowExecutor`: validates, resolves references, executes ordered steps, and saves traces.
 - `TraceStore`: stores and reads run directories under `runs/`.
 - `createWorkflowServer`: serves the built editor and local workflow API.
-- `src/ui`: visual editor state model, action catalog, typed connection rules, and React UI.
+- `src/ui`: visual editor state model, action catalog, typed connection rules, locale resources, and React UI.
 
 Built-in actions:
 
