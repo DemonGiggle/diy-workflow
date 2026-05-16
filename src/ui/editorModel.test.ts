@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addStep, availableConnections, connectCompatibleField, connectField, createInitialEditorState, isCompatibleConnection, moveStep, removeStep, updateStepInput } from "./editorModel.js";
+import { addStep, availableConnections, connectCompatibleField, connectField, createInitialEditorState, getWorkflowConnections, isCompatibleConnection, moveStep, removeStep, updateStepInput } from "./editorModel.js";
 
 test("editor model adds, moves, and removes nodes", () => {
   let state = createInitialEditorState();
@@ -18,7 +18,8 @@ test("editor model adds, moves, and removes nodes", () => {
 
 test("editor model builds schema-style upstream references", () => {
   let state = createInitialEditorState();
-  const [read, summarize] = state.workflow.steps;
+  const read = state.workflow.steps.find((step) => step.type === "io.read_file")!;
+  const summarize = state.workflow.steps.find((step) => step.type === "llm.summarize")!;
   assert.ok(read);
   assert.ok(summarize);
   const connections = availableConnections(state, summarize.id);
@@ -36,7 +37,7 @@ test("editor model filters upstream connections by compatible field kind", () =>
   const jsonConnections = availableConnections(state, exactMatch.id, actualField);
   assert.ok(jsonConnections.some((connection) => connection.field.name === "bytes"));
 
-  const summarize = state.workflow.steps[1]!;
+  const summarize = state.workflow.steps.find((step) => step.type === "llm.summarize")!;
   const textField = { name: "text", label: "Text", kind: "textarea" as const, connectable: true };
   const textConnections = availableConnections(state, summarize.id, textField);
   assert.ok(textConnections.some((connection) => connection.field.name === "content"));
@@ -53,17 +54,30 @@ test("editor model exposes compatibility rules for UI wiring", () => {
 
 test("editor model only connects compatible visual ports", () => {
   let state = createInitialEditorState();
-  const [read, summarize] = state.workflow.steps;
+  const read = state.workflow.steps.find((step) => step.type === "io.read_file")!;
+  const summarize = state.workflow.steps.find((step) => step.type === "llm.summarize")!;
   assert.ok(read);
   assert.ok(summarize);
 
   const invalid = connectCompatibleField(state, summarize.id, "text", read.id, "bytes");
   assert.equal(invalid.ok, false);
-  assert.equal(summarizeInput(invalid.state), `{{steps.${read.id}.output.content}}`);
+  assert.equal(summarizeInput(invalid.state), summarizeInput(state));
 
   const valid = connectCompatibleField(state, summarize.id, "text", read.id, "content");
   assert.equal(valid.ok, true);
   assert.equal(summarizeInput(valid.state), `{{steps.${read.id}.output.content}}`);
+});
+
+test("editor model extracts port-level workflow connections", () => {
+  const state = createInitialEditorState();
+  const read = state.workflow.steps.find((step) => step.type === "io.read_file")!;
+  const prompt = state.workflow.steps.find((step) => step.type === "llm.prompt")!;
+  const summarize = state.workflow.steps.find((step) => step.type === "llm.summarize")!;
+
+  assert.deepEqual(getWorkflowConnections(state), [
+    { fromStepId: read.id, fromField: "content", toStepId: prompt.id, toField: "prompt" },
+    { fromStepId: prompt.id, fromField: "text", toStepId: summarize.id, toField: "text" },
+  ]);
 });
 
 test("editor model updates primitive field input", () => {
@@ -74,5 +88,6 @@ test("editor model updates primitive field input", () => {
 });
 
 function summarizeInput(state: ReturnType<typeof createInitialEditorState>): unknown {
-  return (state.workflow.steps[1]!.input as Record<string, unknown>).text;
+  const summarize = state.workflow.steps.find((step) => step.type === "llm.summarize")!;
+  return (summarize.input as Record<string, unknown>).text;
 }

@@ -27,6 +27,7 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
 .canvas-grid { position: absolute; inset: 0; min-width: 1500px; min-height: 950px; background-image: linear-gradient(#e8edf4 1px, transparent 1px), linear-gradient(90deg, #e8edf4 1px, transparent 1px); background-size: 24px 24px; }
 .connections { position: absolute; inset: 0; width: 1500px; height: 950px; pointer-events: none; }
 .connections path { fill: none; stroke: #7c8da6; stroke-width: 2; }
+.connections circle { fill: #17a06b; stroke: #ffffff; stroke-width: 1.5; }
 .node { position: absolute; width: 280px; min-height: 164px; background: #fff; border: 1px solid #d5dce7; border-radius: 8px; box-shadow: 0 10px 25px rgba(28, 39, 59, 0.08); padding: 15px; user-select: none; }
 .node.selected { border-color: #1f6feb; box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.12), 0 10px 25px rgba(28, 39, 59, 0.08); }
 .drag-handle { position: absolute; top: 9px; right: 9px; width: 30px; height: 30px; display: grid; place-items: center; color: #596579; background: #f2f5f9; border-radius: 6px; cursor: grab; }
