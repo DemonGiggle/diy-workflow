@@ -8,18 +8,26 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:ui": "vite build",
+    "dev": "vite --host 0.0.0.0",
     "start": "node dist/cli.js",
     "test": "node --test dist/**/*.test.js",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm test && npm run build:ui"
   },
   "dependencies": {
     "ajv": "^8.17.1",
     "commander": "^12.1.0",
+    "lucide-react": "^1.16.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "yaml": "^2.6.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "typescript": "^5.7.2"
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "^5.7.2",
+    "vite": "^8.0.13"
   }
 }
-

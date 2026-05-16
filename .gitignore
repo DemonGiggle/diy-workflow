@@ -1,6 +1,6 @@
 node_modules/
 dist/
+web-dist/
 runs/
 *.log
 .DS_Store
-
