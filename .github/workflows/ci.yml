@@ -22,14 +22,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build CLI
         run: npm run build
 
-      - name: Build UI
+      - name: Build visual editor
         run: npm run build:ui
 
-      - name: Test
-        run: npm test
+      - name: Compile tests
+        run: npm run test:compile
+
+      - name: Run unit and model tests
+        run: npm run test:unit
+
+      - name: Run integration tests
+        run: npm run test:integration
 
       - name: Validate example workflows
         run: |

@@ -18,7 +18,9 @@ This runs:
 
 - TypeScript build
 - production UI build into `web-dist/`
-- node:test coverage for action units, reference resolution, workflow behavior, CLI flows, launched server integration, server API, editor model wiring, mock mode, and localization
+- test compilation into `dist-test/`
+- unit/model tests under `src/**/*.test.ts`
+- integration tests under `tests/integration/**/*.test.ts`
 
 ## Test Layers
 
@@ -30,6 +32,17 @@ The test suite intentionally covers several layers:
 - CLI integration tests under `tests/integration/` for `validate`, `run`, `runs list`, and `runs show`
 - launched server integration tests under `tests/integration/` that spawn `diy-workflow serve` and call static UI and workflow API endpoints
 - UI model/i18n tests for editor wiring and localization coverage
+
+Useful test commands:
+
+~~~sh
+npm run test:compile
+npm run test:unit
+npm run test:integration
+npm test
+~~~
+
+`test:integration` expects the production CLI and UI to be built first because it launches the real `dist/cli.js` server. `npm test` and `npm run check` handle those prerequisites.
 
 ## Run The CLI
 
