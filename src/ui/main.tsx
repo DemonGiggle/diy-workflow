@@ -7,8 +7,10 @@ import { editorActions, getEditorAction, type EditorActionDefinition, type Field
 import {
   addStep,
   availableConnections,
+  connectCompatibleField,
   connectField,
   createInitialEditorState,
+  isCompatibleConnection,
   moveStep,
   removeStep,
   updateStepConfig,
@@ -16,6 +18,7 @@ import {
   type EditorState,
 } from "./editorModel.js";
 import { listRuns, runWorkflow, showRun } from "./apiClient.js";
+import type { OutputDescriptor } from "./actionCatalog.js";
 import "./styles.css";
 
 function App() {
@@ -129,6 +132,7 @@ function groupActionsByNamespace(actions: EditorActionDefinition[]): Map<string,
 
 function Canvas({ state, setState }: { state: EditorState; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
   const [dragging, setDragging] = useState<{ stepId: string; dx: number; dy: number } | null>(null);
+  const [linking, setLinking] = useState<{ stepId: string; field: OutputDescriptor } | null>(null);
 
   function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (!dragging) return;
@@ -140,7 +144,7 @@ function Canvas({ state, setState }: { state: EditorState; setState: React.Dispa
   }
 
   return (
-    <section className="canvas" onPointerMove={onPointerMove} onPointerUp={() => setDragging(null)} onPointerLeave={() => setDragging(null)}>
+    <section className="canvas" onPointerMove={onPointerMove} onPointerUp={() => { setDragging(null); setLinking(null); }} onPointerLeave={() => setDragging(null)}>
       <div className="canvas-grid" />
       <Connections state={state} />
       {state.workflow.steps.map((step, index) => {
@@ -169,11 +173,42 @@ function Canvas({ state, setState }: { state: EditorState; setState: React.Dispa
             <div className="node-io">
               <div>
                 <span>input</span>
-                {(action?.inputFields ?? []).map((field) => <code key={field.name} className="port input-port">{field.name}</code>)}
+                {(action?.inputFields ?? []).map((field) => {
+                  const connectable = linking && field.connectable;
+                  const compatible = connectable ? field.connectable && isLinkCompatible(linking.field, field) : false;
+                  return (
+                    <code
+                      key={field.name}
+                      className={`port input-port ${connectable ? compatible ? "drop-ok" : "drop-blocked" : ""}`}
+                      title={field.connectable ? "Release an output port here to connect" : "This input is not connectable"}
+                      onPointerUp={(event) => {
+                        if (!linking) return;
+                        event.stopPropagation();
+                        const result = connectCompatibleField(state, step.id, field.name, linking.stepId, linking.field.name);
+                        if (result.ok) setState(result.state);
+                        setLinking(null);
+                      }}
+                    >
+                      {field.name}
+                    </code>
+                  );
+                })}
               </div>
               <div>
                 <span>output</span>
-                {(action?.outputFields ?? []).map((field) => <code key={field.name} className="port output-port">{field.name}</code>)}
+                {(action?.outputFields ?? []).map((field) => (
+                  <code
+                    key={field.name}
+                    className={`port output-port ${linking?.stepId === step.id && linking.field.name === field.name ? "linking" : ""}`}
+                    title="Drag to a compatible input port"
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                      setLinking({ stepId: step.id, field });
+                    }}
+                  >
+                    {field.name}
+                  </code>
+                ))}
               </div>
             </div>
           </article>
@@ -181,6 +216,11 @@ function Canvas({ state, setState }: { state: EditorState; setState: React.Dispa
       })}
     </section>
   );
+}
+
+function isLinkCompatible(source: OutputDescriptor, target: FieldDescriptor): boolean {
+  if (!target.connectable) return false;
+  return isCompatibleConnection(source.kind, target.kind);
 }
 
 function Connections({ state }: { state: EditorState }) {

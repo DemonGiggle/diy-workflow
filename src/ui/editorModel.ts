@@ -19,6 +19,12 @@ export interface ConnectionCandidate {
   compatible: boolean;
 }
 
+export interface ConnectionResult {
+  state: EditorState;
+  ok: boolean;
+  message?: string;
+}
+
 export function createInitialEditorState(): EditorState {
   const read = createStep("io.read_file", 0);
   const summarize = createStep("llm.summarize", 1);
@@ -80,6 +86,33 @@ export function updateStepConfig(state: EditorState, stepId: string, field: stri
 
 export function connectField(state: EditorState, targetStepId: string, targetField: string, sourceStepId: string, sourceField: string): EditorState {
   return updateStepInput(state, targetStepId, targetField, referenceFor(sourceStepId, sourceField));
+}
+
+export function connectCompatibleField(
+  state: EditorState,
+  targetStepId: string,
+  targetFieldName: string,
+  sourceStepId: string,
+  sourceFieldName: string,
+): ConnectionResult {
+  const targetStep = state.workflow.steps.find((step) => step.id === targetStepId);
+  const sourceStep = state.workflow.steps.find((step) => step.id === sourceStepId);
+  if (!targetStep || !sourceStep) return { state, ok: false, message: "Missing source or target step" };
+
+  const targetAction = getEditorAction(targetStep.type);
+  const sourceAction = getEditorAction(sourceStep.type);
+  const targetField = targetAction?.inputFields.find((field) => field.name === targetFieldName);
+  const sourceField = sourceAction?.outputFields.find((field) => field.name === sourceFieldName);
+  if (!targetField || !sourceField) return { state, ok: false, message: "Missing source or target field" };
+  if (!targetField.connectable) return { state, ok: false, message: `${targetField.name} does not accept connections` };
+  if (!isCompatibleConnection(sourceField.kind, targetField.kind)) {
+    return { state, ok: false, message: `${sourceField.kind} output cannot connect to ${targetField.kind} input` };
+  }
+
+  return {
+    state: connectField(state, targetStepId, targetFieldName, sourceStepId, sourceFieldName),
+    ok: true,
+  };
 }
 
 export function availableConnections(state: EditorState, targetStepId: string, targetField?: FieldDescriptor): ConnectionCandidate[] {

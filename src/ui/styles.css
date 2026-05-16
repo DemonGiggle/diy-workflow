@@ -38,6 +38,10 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
 .port { display: block; width: 100%; min-height: 22px; padding: 3px 6px; border-radius: 5px; font-size: 11px; color: #344054; word-break: break-word; }
 .input-port { background: #f2f5f9; border-left: 3px solid #7c8da6; }
 .output-port { background: #ecfdf3; border-right: 3px solid #17a06b; text-align: right; }
+.output-port { cursor: crosshair; }
+.output-port.linking { outline: 2px solid #17a06b; outline-offset: 1px; }
+.input-port.drop-ok { background: #e9f9ef; border-left-color: #17a06b; outline: 2px solid rgba(23, 160, 107, 0.22); }
+.input-port.drop-blocked { background: #fff1f0; border-left-color: #d92d20; outline: 2px solid rgba(217, 45, 32, 0.18); }
 .inspector, .yaml-panel, .trace-panel { border: 1px solid #dce3ec; border-radius: 8px; padding: 14px; background: #fff; }
 .step-meta { display: grid; grid-template-columns: 1fr; gap: 8px; }
 label { display: grid; gap: 5px; color: #4b5565; font-size: 12px; }

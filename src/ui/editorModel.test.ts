@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addStep, availableConnections, connectField, createInitialEditorState, isCompatibleConnection, moveStep, removeStep, updateStepInput } from "./editorModel.js";
+import { addStep, availableConnections, connectCompatibleField, connectField, createInitialEditorState, isCompatibleConnection, moveStep, removeStep, updateStepInput } from "./editorModel.js";
 
 test("editor model adds, moves, and removes nodes", () => {
   let state = createInitialEditorState();
@@ -49,6 +49,21 @@ test("editor model exposes compatibility rules for UI wiring", () => {
   assert.equal(isCompatibleConnection("number", "json"), true);
   assert.equal(isCompatibleConnection("array", "array"), true);
   assert.equal(isCompatibleConnection("boolean", "number"), false);
+});
+
+test("editor model only connects compatible visual ports", () => {
+  let state = createInitialEditorState();
+  const [read, summarize] = state.workflow.steps;
+  assert.ok(read);
+  assert.ok(summarize);
+
+  const invalid = connectCompatibleField(state, summarize.id, "text", read.id, "bytes");
+  assert.equal(invalid.ok, false);
+  assert.equal(summarizeInput(invalid.state), `{{steps.${read.id}.output.content}}`);
+
+  const valid = connectCompatibleField(state, summarize.id, "text", read.id, "content");
+  assert.equal(valid.ok, true);
+  assert.equal(summarizeInput(valid.state), `{{steps.${read.id}.output.content}}`);
 });
 
 test("editor model updates primitive field input", () => {
