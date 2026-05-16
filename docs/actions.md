@@ -1,8 +1,6 @@
 # Actions
 
-Actions are reusable typed building blocks.
-
-Each action defines:
+Actions are reusable typed building blocks. Each action defines a stable runtime contract:
 
 - `type`
 - input schema
@@ -10,40 +8,18 @@ Each action defines:
 - optional config schema
 - `run(input, context)`
 
+This page is an index. Detailed behavior, input/output fields, mock settings, and YAML examples live in the per-action reference pages.
+
 ## Built-In Actions
 
-### `io.read_file`
-
-Reads a text file and emits:
-
-- `path`
-- `content`
-- `bytes`
-
-### `llm.prompt`
-
-Accepts a prompt and emits model text. The MVP implementation is deterministic and suitable for local workflow experiments.
-
-### `llm.summarize`
-
-Summarizes text with model-facing controls such as `maxSentences` and `maxChars`.
-
-### `control.fanout`
-
-Runs multiple branches with the same input.
-
-### `control.fanin`
-
-Merges fanout outputs.
-
-Supported strategies:
-
-- `merge`
-- `first_success`
-
-### `eval.exact_match`
-
-Compares two values exactly and emits whether they matched.
+| Type | Purpose | Reference |
+| --- | --- | --- |
+| `io.read_file` | Read a text file from the local workspace. | [io.read_file](action-reference/io.read_file.md) |
+| `llm.prompt` | Render and run a prompt through the MVP mock LLM provider. | [llm.prompt](action-reference/llm.prompt.md) |
+| `llm.summarize` | Summarize text with deterministic extractive summarization. | [llm.summarize](action-reference/llm.summarize.md) |
+| `control.fanout` | Run multiple action branches with the same ambient input value. | [control.fanout](action-reference/control.fanout.md) |
+| `control.fanin` | Merge fanout results using a configured strategy. | [control.fanin](action-reference/control.fanin.md) |
+| `eval.exact_match` | Compare two values using strict deep equality. | [eval.exact_match](action-reference/eval.exact_match.md) |
 
 ## Registry
 
@@ -55,21 +31,7 @@ Every built-in action supports action-level mock mode through `config.mock.enabl
 
 Mock settings stay in `config`, not `input`, so the input schema still describes the real workflow contract while tests and UI runs can opt into deterministic outputs.
 
-~~~yaml
-steps:
-  - id: read
-    type: io.read_file
-    input:
-      path: does-not-need-to-exist.txt
-    config:
-      mock:
-        enabled: true
-        path: mock://requirements.txt
-        content: Mocked file content
-        bytes: 19
-~~~
-
-Run the mock example:
+Run the deterministic mock example:
 
 ~~~sh
 node dist/cli.js validate examples/mock-e2e.yaml
