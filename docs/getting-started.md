@@ -36,6 +36,8 @@ The test suite intentionally covers several layers:
 Useful test commands:
 
 ~~~sh
+npm run build
+npm run build:ui
 npm run test:compile
 npm run test:unit
 npm run test:integration

@@ -33,6 +33,7 @@ prompt: "{{steps.io_read_file_1.output.content}}"
 
 The editor server provides:
 
+- `GET /api/health`
 - `POST /api/workflows/validate`
 - `POST /api/workflows/run`
 - `GET /api/runs`

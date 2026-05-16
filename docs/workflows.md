@@ -41,6 +41,8 @@ Reference format:
 {{steps.step_id.output.field}}
 ~~~
 
+Use `{{steps.step_id.output}}` to pass the whole output object, or append a field path such as `{{steps.step_id.output.summary}}` to pass one nested value.
+
 References must point to earlier steps. Forward references are rejected during validation.
 
 ## Validation
@@ -50,9 +52,11 @@ Validation checks:
 - workflow shape
 - unique step ids
 - valid action types
-- valid references
+- reference step availability
 - action input schemas
 - action config schemas
+
+When an input contains references, static input-schema validation is deferred until execution because the referenced value is not known yet. During execution, references are resolved, missing output paths fail the step, and the resolved input is validated against the action input schema.
 
 Run validation with:
 
