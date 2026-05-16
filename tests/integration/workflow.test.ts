@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDefaultRegistry } from "./actions/index.js";
-import { WorkflowExecutor } from "./executor.js";
-import { TraceStore } from "./trace.js";
-import { WorkflowValidator } from "./validator.js";
-import type { WorkflowDocument } from "./types.js";
+import { createDefaultRegistry } from "../../src/actions/index.js";
+import { WorkflowExecutor } from "../../src/executor.js";
+import { TraceStore } from "../../src/trace.js";
+import { WorkflowValidator } from "../../src/validator.js";
+import type { WorkflowDocument } from "../../src/types.js";
 
 test("validator rejects duplicate ids and unknown action types", () => {
   const workflow: WorkflowDocument = {

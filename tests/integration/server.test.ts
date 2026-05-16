@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { AddressInfo } from "node:net";
-import { createWorkflowServer } from "./server.js";
-import type { RunTrace, WorkflowDocument } from "./types.js";
+import { createWorkflowServer } from "../../src/server.js";
+import type { RunTrace, WorkflowDocument } from "../../src/types.js";
 
 test("workflow server runs workflows and exposes saved traces", async () => {
   const dir = await mkdtemp(join(tmpdir(), "diy-workflow-server-"));
@@ -79,6 +79,9 @@ test("workflow server validates workflow requests", async () => {
 
 test("workflow server serves built UI from package root when cwd differs", async () => {
   const dir = await mkdtemp(join(tmpdir(), "diy-workflow-server-cwd-"));
+  await mkdir(resolve("dist-test", "web-dist"), { recursive: true });
+  await writeFile(resolve("dist-test", "web-dist", "index.html"), "<main>diy-workflow</main>", "utf8");
+
   const server = createWorkflowServer({ cwd: dir });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
