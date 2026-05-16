@@ -77,3 +77,17 @@ test("workflow server validates workflow requests", async () => {
   }
 });
 
+test("workflow server serves built UI from package root when cwd differs", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-server-cwd-"));
+  const server = createWorkflowServer({ cwd: dir });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+  try {
+    const response = await fetch(baseUrl);
+    assert.equal(response.ok, true);
+    assert.match(await response.text(), /diy-workflow/);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});

@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createDefaultRegistry } from "./actions/index.js";
 import { WorkflowExecutor } from "./executor.js";
 import { TraceStore } from "./trace.js";
@@ -20,7 +21,7 @@ interface JsonResponse {
 
 export function createWorkflowServer(options: WorkflowServerOptions = {}): Server {
   const cwd = resolve(options.cwd ?? process.cwd());
-  const webRoot = resolve(options.webRoot ?? join(cwd, "web-dist"));
+  const webRoot = resolve(options.webRoot ?? join(packageRoot(), "web-dist"));
   const traceStore = new TraceStore(resolve(options.traceRoot ?? join(cwd, "runs")));
   const registry = createDefaultRegistry();
 
@@ -42,6 +43,10 @@ export function createWorkflowServer(options: WorkflowServerOptions = {}): Serve
       });
     }
   });
+}
+
+function packageRoot(): string {
+  return resolve(fileURLToPath(import.meta.url), "..", "..");
 }
 
 async function routeApi(

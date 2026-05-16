@@ -1,8 +1,79 @@
 # diy-workflow
 
-A CLI-first workflow experiment engine built around typed reusable actions.
+A workflow experiment engine built around typed reusable actions.
 
-Workflows are YAML files made of ordered steps:
+The MVP is CLI-first, but it also includes a visual editor foundation for building workflows from typed action inputs and outputs.
+
+## What it does
+
+- Defines workflows as ordered YAML steps.
+- Treats every action as a reusable typed building block.
+- Connects action outputs into later action inputs with references like `{{steps.read.output.content}}`.
+- Validates workflow shape, unique step ids, action types, references, and schemas before execution.
+- Executes workflows and writes traces under `runs/run_xxxx/trace.json`.
+- Provides a visual editor for adding actions, editing inputs/config, wiring typed ports, running workflows, and inspecting saved traces.
+
+## Install
+
+```sh
+npm install
+```
+
+## Build and test
+
+```sh
+npm run check
+```
+
+This runs:
+
+- TypeScript build
+- production UI build into `web-dist/`
+- node:test coverage for core workflow behavior, server API, and editor model wiring
+
+## CLI usage
+
+```sh
+npm run build
+
+node dist/cli.js validate examples/summarize.yaml
+node dist/cli.js run examples/summarize.yaml
+node dist/cli.js runs list
+node dist/cli.js runs show run_0001
+```
+
+Execution traces are written to `runs/run_xxxx/trace.json`.
+
+## Visual editor
+
+Build the UI before serving:
+
+```sh
+npm run build
+npm run build:ui
+npm run serve -- --host 127.0.0.1 --port 4173
+```
+
+Then open:
+
+```text
+http://127.0.0.1:4173/
+```
+
+The editor server provides:
+
+- `POST /api/workflows/validate`
+- `POST /api/workflows/run`
+- `GET /api/runs`
+- `GET /api/runs/:run_id`
+
+Notes:
+
+- `web-dist/` is resolved from the installed package/repo root, so the editor can be served even if you start the command from another working directory.
+- `runs/` is resolved from the directory where you start `diy-workflow serve`, so traces stay with the workspace you are operating in.
+- If `web-dist/index.html` is missing, run `npm run build:ui`.
+
+## Workflow example
 
 ```yaml
 name: demo
@@ -11,6 +82,7 @@ steps:
     type: io.read_file
     input:
       path: input.txt
+
   - id: summarize
     type: llm.summarize
     input:
@@ -19,27 +91,15 @@ steps:
       maxSentences: 2
 ```
 
-## Commands
-
-```sh
-npm install
-npm run build
-
-npx diy-workflow validate examples/summarize.yaml
-npx diy-workflow run examples/summarize.yaml
-npx diy-workflow runs list
-npx diy-workflow runs show run_0001
-```
-
-Execution traces are written to `runs/run_xxxx/trace.json`.
-
 ## Architecture
 
-- `ActionDefinition`: reusable typed building block with `type`, input schema, output schema, and `run(input, context)`.
+- `ActionDefinition`: reusable typed building block with `type`, input schema, output schema, optional config schema, and `run(input, context)`.
 - `ActionRegistry`: lookup and schema metadata for actions.
 - `WorkflowValidator`: validates unique ids, action types, references, and static schema constraints.
-- `Executor`: load, validate, resolve inputs, execute ordered steps, and save trace.
-- `TraceStore`: stores run directories under `runs/`.
+- `WorkflowExecutor`: validates, resolves references, executes ordered steps, and saves traces.
+- `TraceStore`: stores and reads run directories under `runs/`.
+- `createWorkflowServer`: serves the built editor and local workflow API.
+- `src/ui`: visual editor state model, action catalog, typed connection rules, and React UI.
 
 Built-in actions:
 
@@ -49,3 +109,4 @@ Built-in actions:
 - `control.fanout`
 - `control.fanin`
 - `eval.exact_match`
+
