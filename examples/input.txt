@@ -1,0 +1,2 @@
+DIY workflows should be small, typed, and composable. Each action should expose clear input and output schemas. A later UI can use those schemas to decide which nodes may connect. The CLI should stay useful for fast experiments.
+

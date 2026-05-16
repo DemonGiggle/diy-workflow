@@ -1,0 +1,26 @@
+name: fanout-demo
+steps:
+  - id: variants
+    type: control.fanout
+    input:
+      value:
+        text: "alpha beta gamma"
+      branches:
+        - id: prompt_a
+          type: llm.prompt
+          input:
+            prompt: "Return the input text"
+        - id: summarize_a
+          type: llm.summarize
+          input:
+            text: "alpha beta gamma. delta epsilon zeta."
+          config:
+            maxSentences: 1
+
+  - id: merged
+    type: control.fanin
+    input:
+      items: "{{steps.variants.output.results}}"
+    config:
+      strategy: merge
+

@@ -1,0 +1,19 @@
+name: summarize-demo
+steps:
+  - id: read
+    type: io.read_file
+    input:
+      path: input.txt
+
+  - id: summarize
+    type: llm.summarize
+    input:
+      text: "{{steps.read.output.content}}"
+    config:
+      maxSentences: 2
+
+  - id: check
+    type: eval.exact_match
+    input:
+      actual: "{{steps.summarize.output.summary}}"
+      expected: "DIY workflows should be small, typed, and composable. Each action should expose clear input and output schemas."
