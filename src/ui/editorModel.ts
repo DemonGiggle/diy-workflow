@@ -19,6 +19,13 @@ export interface ConnectionCandidate {
   compatible: boolean;
 }
 
+export interface WorkflowConnection {
+  fromStepId: string;
+  fromField: string;
+  toStepId: string;
+  toField: string;
+}
+
 export interface ConnectionResult {
   state: EditorState;
   ok: boolean;
@@ -27,14 +34,17 @@ export interface ConnectionResult {
 
 export function createInitialEditorState(): EditorState {
   const read = createStep("io.read_file", 0);
-  const summarize = createStep("llm.summarize", 1);
-  summarize.input = { text: referenceFor(read.id, "content") };
+  const prompt = createStep("llm.prompt", 1);
+  const summarize = createStep("llm.summarize", 2);
+  prompt.input = { prompt: referenceFor(read.id, "content") };
+  summarize.input = { text: referenceFor(prompt.id, "text") };
   return {
-    workflow: { name: "visual-workflow", steps: [read, summarize] },
-    selectedStepId: summarize.id,
+    workflow: { name: "visual-workflow", steps: [read, prompt, summarize] },
+    selectedStepId: prompt.id,
     positions: {
       [read.id]: { x: 72, y: 92 },
-      [summarize.id]: { x: 420, y: 92 },
+      [prompt.id]: { x: 420, y: 92 },
+      [summarize.id]: { x: 768, y: 92 },
     },
   };
 }
@@ -145,6 +155,20 @@ export function referenceFor(stepId: string, field: string): string {
   return `{{steps.${stepId}.output.${field}}}`;
 }
 
+export function getWorkflowConnections(state: EditorState): WorkflowConnection[] {
+  return state.workflow.steps.flatMap((step) => {
+    const input = asObject(step.input);
+    return Object.entries(input).flatMap(([targetField, value]) =>
+      extractFieldReferences(value).map((reference) => ({
+        fromStepId: reference.stepId,
+        fromField: reference.field,
+        toStepId: step.id,
+        toField: targetField,
+      })),
+    );
+  });
+}
+
 export function buildMockTrace(workflow: WorkflowDocument): StepTrace[] {
   return workflow.steps.map((step, index) => ({
     id: step.id,
@@ -184,4 +208,10 @@ function asObject(value: unknown): JsonObject {
 function pruneEmpty(value: JsonObject): JsonObject | undefined {
   const entries = Object.entries(value).filter(([, item]) => item !== "" && item !== undefined);
   return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
+function extractFieldReferences(value: unknown): Array<{ stepId: string; field: string }> {
+  if (typeof value !== "string") return [];
+  return [...value.matchAll(/{{\s*steps\.([A-Za-z0-9_-]+)\.output\.([A-Za-z0-9_.-]+)\s*}}/g)]
+    .map((match) => ({ stepId: match[1]!, field: match[2]! }));
 }

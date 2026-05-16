@@ -10,6 +10,7 @@ import {
   connectCompatibleField,
   connectField,
   createInitialEditorState,
+  getWorkflowConnections,
   isCompatibleConnection,
   moveStep,
   removeStep,
@@ -224,23 +225,34 @@ function isLinkCompatible(source: OutputDescriptor, target: FieldDescriptor): bo
 }
 
 function Connections({ state }: { state: EditorState }) {
-  const lines = state.workflow.steps.flatMap((step) => {
-    const text = JSON.stringify(step.input);
-    return state.workflow.steps.flatMap((source) => text.includes(`steps.${source.id}.output`) ? [{ from: source.id, to: step.id }] : []);
-  });
+  const lines = getWorkflowConnections(state);
   return (
     <svg className="connections">
       {lines.map((line, index) => {
-        const from = state.positions[line.from] ?? { x: 0, y: 0 };
-        const to = state.positions[line.to] ?? { x: 0, y: 0 };
-        const x1 = from.x + 270;
-        const y1 = from.y + 64;
-        const x2 = to.x;
-        const y2 = to.y + 64;
-        return <path key={`${line.from}-${line.to}-${index}`} d={`M ${x1} ${y1} C ${x1 + 80} ${y1}, ${x2 - 80} ${y2}, ${x2} ${y2}`} />;
+        const from = portPosition(state, line.fromStepId, line.fromField, "output");
+        const to = portPosition(state, line.toStepId, line.toField, "input");
+        return (
+          <g key={`${line.fromStepId}.${line.fromField}-${line.toStepId}.${line.toField}-${index}`}>
+            <path d={`M ${from.x} ${from.y} C ${from.x + 86} ${from.y}, ${to.x - 86} ${to.y}, ${to.x} ${to.y}`} />
+            <circle cx={from.x} cy={from.y} r="3" />
+            <circle cx={to.x} cy={to.y} r="3" />
+          </g>
+        );
       })}
     </svg>
   );
+}
+
+function portPosition(state: EditorState, stepId: string, fieldName: string, side: "input" | "output"): { x: number; y: number } {
+  const step = state.workflow.steps.find((item) => item.id === stepId);
+  const action = step ? getEditorAction(step.type) : undefined;
+  const pos = state.positions[stepId] ?? { x: 0, y: 0 };
+  const fields = side === "input" ? action?.inputFields ?? [] : action?.outputFields ?? [];
+  const fieldIndex = Math.max(fields.findIndex((field) => field.name === fieldName), 0);
+  return {
+    x: side === "input" ? pos.x + 16 : pos.x + 264,
+    y: pos.y + 154 + fieldIndex * 27,
+  };
 }
 
 function Inspector({ state, step, setState }: { state: EditorState; step: WorkflowStep; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
