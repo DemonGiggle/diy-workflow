@@ -17,6 +17,7 @@ load -> validate -> resolve inputs -> execute -> save trace
 - `TraceStore`: stores and reads run directories under `runs/`
 - `createWorkflowServer`: serves the built editor and local workflow API
 - `src/ui`: visual editor state model, action catalog, typed connection rules, locale resources, and React UI
+- `.github/workflows/ci.yml`: builds the CLI, builds the editor, compiles tests, runs unit/model tests, runs integration tests, and validates example workflows
 
 ## Directory Guide
 
@@ -24,6 +25,7 @@ load -> validate -> resolve inputs -> execute -> save trace
 src/
   actions/        built-in actions and mock helpers
   ui/             visual editor, editor model, action catalog, i18n
+  *.test.ts       colocated unit/model tests
   cli.ts          command-line interface
   executor.ts     workflow execution
   registry.ts     action registry
@@ -34,9 +36,20 @@ src/
 
 docs/             project documentation
 examples/         runnable workflow examples
+tests/
+  integration/    workflow, server, CLI, and launched-server integration tests
 runs/             generated execution traces
+dist/             generated production CLI build output
+dist-test/        generated test compilation output
 web-dist/         generated UI build output
 ~~~
+
+## Build And Test Configuration
+
+- `tsconfig.json`: production TypeScript build for the CLI/runtime into `dist/`
+- `tsconfig.ui.json`: Vite/React TypeScript settings for the visual editor
+- `tsconfig.test.json`: test-only TypeScript build for `src/` and `tests/` into `dist-test/`
+- `vite.config.ts`: builds the visual editor into `web-dist/`
 
 ## UI-Friendly Action Metadata
 
