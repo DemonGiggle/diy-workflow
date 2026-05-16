@@ -36,7 +36,12 @@ export const editorActions: EditorActionDefinition[] = [
     label: "Read File",
     description: "Read a text file and emit content, path, and byte count.",
     inputFields: [{ name: "path", label: "Path", kind: "text", required: true, placeholder: "input.txt" }],
-    configFields: [],
+    configFields: [
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.path", label: "Mock path", kind: "text", placeholder: "mock/input.txt" },
+      { name: "mock.content", label: "Mock content", kind: "textarea", placeholder: "Optional file content" },
+      { name: "mock.bytes", label: "Mock bytes", kind: "number" },
+    ],
     outputFields: [
       { name: "path", label: "Path", kind: "text" },
       { name: "content", label: "Content", kind: "textarea" },
@@ -50,7 +55,10 @@ export const editorActions: EditorActionDefinition[] = [
     label: "Prompt",
     description: "Prompt an AI model. MVP uses deterministic mock output.",
     inputFields: [{ name: "prompt", label: "Prompt", kind: "textarea", required: true, connectable: true, placeholder: "Write a concise answer about {{input}}" }],
-    configFields: [{ name: "mockResponse", label: "Mock response", kind: "textarea", placeholder: "Optional deterministic response" }],
+    configFields: [
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.response", label: "Mock response", kind: "textarea", placeholder: "Optional deterministic response" },
+    ],
     outputFields: [
       { name: "text", label: "Text", kind: "textarea" },
       { name: "provider", label: "Provider", kind: "text" },
@@ -67,6 +75,9 @@ export const editorActions: EditorActionDefinition[] = [
     configFields: [
       { name: "maxSentences", label: "Max sentences", kind: "number", placeholder: "3" },
       { name: "maxChars", label: "Max characters", kind: "number" },
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.summary", label: "Mock summary", kind: "textarea" },
+      { name: "mock.sentenceCount", label: "Mock sentence count", kind: "number" },
     ],
     outputFields: [
       { name: "summary", label: "Summary", kind: "textarea" },
@@ -84,7 +95,10 @@ export const editorActions: EditorActionDefinition[] = [
       { name: "value", label: "Value", kind: "json", connectable: true },
       { name: "branches", label: "Branches", kind: "array", required: true },
     ],
-    configFields: [],
+    configFields: [
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.results", label: "Mock results", kind: "array" },
+    ],
     outputFields: [{ name: "results", label: "Results", kind: "array" }],
     createInput: () => ({ value: {}, branches: [] }),
   },
@@ -94,7 +108,13 @@ export const editorActions: EditorActionDefinition[] = [
     label: "Fanin",
     description: "Merge fanout outputs.",
     inputFields: [{ name: "items", label: "Items", kind: "json", required: true, connectable: true }],
-    configFields: [{ name: "strategy", label: "Strategy", kind: "text", placeholder: "merge | first_success" }],
+    configFields: [
+      { name: "strategy", label: "Strategy", kind: "text", placeholder: "merge | first_success" },
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.strategy", label: "Mock strategy", kind: "text", placeholder: "merge | first_success" },
+      { name: "mock.output", label: "Mock output", kind: "json" },
+      { name: "mock.count", label: "Mock count", kind: "number" },
+    ],
     outputFields: [
       { name: "strategy", label: "Strategy", kind: "text" },
       { name: "output", label: "Output", kind: "json" },
@@ -112,7 +132,12 @@ export const editorActions: EditorActionDefinition[] = [
       { name: "actual", label: "Actual", kind: "json", required: true, connectable: true },
       { name: "expected", label: "Expected", kind: "json", required: true, connectable: true },
     ],
-    configFields: [],
+    configFields: [
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.matched", label: "Mock matched", kind: "boolean" },
+      { name: "mock.actual", label: "Mock actual", kind: "json" },
+      { name: "mock.expected", label: "Mock expected", kind: "json" },
+    ],
     outputFields: [
       { name: "matched", label: "Matched", kind: "boolean" },
       { name: "actual", label: "Actual", kind: "json" },

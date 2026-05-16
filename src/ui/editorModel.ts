@@ -90,7 +90,7 @@ export function updateStepInput(state: EditorState, stepId: string, field: strin
 export function updateStepConfig(state: EditorState, stepId: string, field: string, value: unknown): EditorState {
   return updateStep(state, stepId, (step) => ({
     ...step,
-    config: pruneEmpty({ ...step.config, [field]: value }),
+    config: pruneEmpty(setPath(asObject(step.config), field.split("."), value)),
   }));
 }
 
@@ -206,8 +206,20 @@ function asObject(value: unknown): JsonObject {
 }
 
 function pruneEmpty(value: JsonObject): JsonObject | undefined {
-  const entries = Object.entries(value).filter(([, item]) => item !== "" && item !== undefined);
+  const entries = Object.entries(value)
+    .map(([key, item]) => [key, item && typeof item === "object" && !Array.isArray(item) ? pruneEmpty(item as JsonObject) : item] as const)
+    .filter(([, item]) => item !== "" && item !== undefined);
   return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
+function setPath(source: JsonObject, path: string[], value: unknown): JsonObject {
+  const [head, ...tail] = path;
+  if (!head) return source;
+  if (tail.length === 0) return { ...source, [head]: value };
+  return {
+    ...source,
+    [head]: setPath(asObject(source[head]), tail, value),
+  };
 }
 
 function extractFieldReferences(value: unknown): Array<{ stepId: string; field: string }> {

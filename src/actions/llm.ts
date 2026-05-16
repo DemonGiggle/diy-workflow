@@ -1,4 +1,5 @@
 import type { ActionDefinition, JsonObject } from "../types.js";
+import { readMockConfig } from "./mock.js";
 
 interface PromptInput {
   prompt: string;
@@ -45,10 +46,24 @@ export const promptAction: ActionDefinition<PromptInput, PromptOutput> = {
     additionalProperties: false,
     properties: {
       mockResponse: { type: "string", nullable: true },
+      mock: {
+        type: "object",
+        nullable: true,
+        additionalProperties: false,
+        properties: {
+          enabled: { type: "boolean", nullable: true },
+          response: { type: "string", nullable: true },
+        },
+      },
     },
   },
   async run(input, _context, config) {
-    const mockResponse = typeof config?.mockResponse === "string" ? config.mockResponse : undefined;
+    const mock = readMockConfig(config);
+    const mockResponse = typeof mock?.response === "string"
+      ? mock.response
+      : typeof config?.mockResponse === "string"
+        ? config.mockResponse
+        : undefined;
     const text = mockResponse ?? renderPrompt(input.prompt, input.variables ?? {});
     return { text, provider: "mock" };
   },
@@ -80,9 +95,28 @@ export const summarizeAction: ActionDefinition<SummarizeInput, SummarizeOutput> 
     properties: {
       maxSentences: { type: "number", minimum: 1, nullable: true },
       maxChars: { type: "number", minimum: 1, nullable: true },
+      mock: {
+        type: "object",
+        nullable: true,
+        additionalProperties: false,
+        properties: {
+          enabled: { type: "boolean", nullable: true },
+          summary: { type: "string", nullable: true },
+          sentenceCount: { type: "number", minimum: 0, nullable: true },
+        },
+      },
     },
   },
   async run(input, _context, config) {
+    const mock = readMockConfig(config);
+    if (mock) {
+      const summary = typeof mock.summary === "string" ? mock.summary : "";
+      return {
+        summary,
+        sentenceCount: typeof mock.sentenceCount === "number" ? mock.sentenceCount : splitSentences(summary).length,
+      };
+    }
+
     const maxSentences = typeof config?.maxSentences === "number" ? config.maxSentences : 3;
     const maxChars = typeof config?.maxChars === "number" ? config.maxChars : undefined;
     const sentences = splitSentences(input.text);
@@ -110,4 +144,3 @@ function splitSentences(text: string): string[] {
     .map((sentence) => sentence.trim())
     .filter(Boolean);
 }
-
