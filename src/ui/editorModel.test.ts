@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addStep, availableConnections, connectCompatibleField, connectField, createInitialEditorState, getWorkflowConnections, isCompatibleConnection, moveStep, removeStep, updateStepInput } from "./editorModel.js";
+import { addStep, availableConnections, connectCompatibleField, connectField, createInitialEditorState, getWorkflowConnections, isCompatibleConnection, moveStep, removeStep, updateStepConfig, updateStepInput } from "./editorModel.js";
 
 test("editor model adds, moves, and removes nodes", () => {
   let state = createInitialEditorState();
@@ -87,7 +87,20 @@ test("editor model updates primitive field input", () => {
   assert.equal((state.workflow.steps[0]!.input as Record<string, unknown>).path, "new.txt");
 });
 
+test("editor model updates nested mock config fields", () => {
+  let state = createInitialEditorState();
+  const prompt = state.workflow.steps.find((step) => step.type === "llm.prompt")!;
+  state = updateStepConfig(state, prompt.id, "mock.enabled", true);
+  state = updateStepConfig(state, prompt.id, "mock.response", "mocked response");
+  assert.deepEqual(promptConfig(state), { mock: { enabled: true, response: "mocked response" } });
+});
+
 function summarizeInput(state: ReturnType<typeof createInitialEditorState>): unknown {
   const summarize = state.workflow.steps.find((step) => step.type === "llm.summarize")!;
   return (summarize.input as Record<string, unknown>).text;
+}
+
+function promptConfig(state: ReturnType<typeof createInitialEditorState>): unknown {
+  const prompt = state.workflow.steps.find((step) => step.type === "llm.prompt")!;
+  return prompt.config;
 }

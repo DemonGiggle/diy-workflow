@@ -1,4 +1,5 @@
 import type { ActionDefinition, JsonObject, WorkflowStep } from "../types.js";
+import { anyMockValueSchema, readMockConfig } from "./mock.js";
 
 interface FanoutInput {
   value?: unknown;
@@ -71,7 +72,27 @@ export const fanoutAction: ActionDefinition<FanoutInput, FanoutOutput> = {
       },
     },
   },
-  async run(input, context) {
+  configSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      mock: {
+        type: "object",
+        nullable: true,
+        additionalProperties: false,
+        properties: {
+          enabled: { type: "boolean", nullable: true },
+          results: { type: "array", nullable: true },
+        },
+      },
+    },
+  },
+  async run(input, context, config) {
+    const mock = readMockConfig(config);
+    if (mock) {
+      return { results: Array.isArray(mock.results) ? mock.results as FanoutOutput["results"] : [] };
+    }
+
     const results = await Promise.all(input.branches.map(async (branch) => {
       try {
         const branchInput = injectFanoutValue(branch.input, input.value);
@@ -117,9 +138,30 @@ export const faninAction: ActionDefinition<FaninInput, FaninOutput> = {
     additionalProperties: false,
     properties: {
       strategy: { type: "string", enum: ["merge", "first_success"], nullable: true },
+      mock: {
+        type: "object",
+        nullable: true,
+        additionalProperties: false,
+        properties: {
+          enabled: { type: "boolean", nullable: true },
+          strategy: { type: "string", enum: ["merge", "first_success"], nullable: true },
+          output: anyMockValueSchema,
+          count: { type: "number", minimum: 0, nullable: true },
+        },
+      },
     },
   },
   async run(input, _context, config) {
+    const mock = readMockConfig(config);
+    if (mock) {
+      const strategy = mock.strategy === "first_success" ? "first_success" : "merge";
+      return {
+        strategy,
+        output: "output" in mock ? mock.output : null,
+        count: typeof mock.count === "number" ? mock.count : 0,
+      };
+    }
+
     const strategy = (config?.strategy === "first_success" ? "first_success" : "merge") as "merge" | "first_success";
     if (strategy === "first_success") {
       const first = input.items.find((item) => isSuccessResult(item));
@@ -160,4 +202,3 @@ function stringify(value: unknown): string {
   if (value === null || value === undefined) return "";
   return JSON.stringify(value);
 }
-

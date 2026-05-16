@@ -4,6 +4,9 @@ steps:
     type: io.read_file
     input:
       path: input.txt
+    config:
+      mock:
+        enabled: false
 
   - id: draft_response
     type: llm.prompt
@@ -14,10 +17,12 @@ steps:
         Requirements:
         {{steps.read_requirements.output.content}}
     config:
-      mockResponse: |
-        1. Parse the workflow into typed steps.
-        2. Validate action schemas and references before execution.
-        3. Execute steps in order and persist a trace.
+      mock:
+        enabled: true
+        response: |
+          1. Parse the workflow into typed steps.
+          2. Validate action schemas and references before execution.
+          3. Execute steps in order and persist a trace.
 
   - id: summarize_plan
     type: llm.summarize
@@ -25,6 +30,8 @@ steps:
       text: "{{steps.draft_response.output.text}}"
     config:
       maxSentences: 2
+      mock:
+        enabled: false
 
   - id: verify_summary
     type: eval.exact_match

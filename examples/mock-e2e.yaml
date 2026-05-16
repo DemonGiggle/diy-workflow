@@ -1,0 +1,40 @@
+name: mock-e2e
+steps:
+  - id: read
+    type: io.read_file
+    input:
+      path: does-not-need-to-exist.txt
+    config:
+      mock:
+        enabled: true
+        path: mock://requirements.txt
+        content: |
+          Mock workflows should run without local files or external LLM connections.
+        bytes: 70
+
+  - id: prompt
+    type: llm.prompt
+    input:
+      prompt: "{{steps.read.output.content}}"
+    config:
+      mock:
+        enabled: true
+        response: |
+          Build a typed mock mode for deterministic end-to-end tests.
+
+  - id: summarize
+    type: llm.summarize
+    input:
+      text: "{{steps.prompt.output.text}}"
+    config:
+      mock:
+        enabled: true
+        summary: "Build typed mock mode."
+        sentenceCount: 1
+
+  - id: eval
+    type: eval.exact_match
+    input:
+      actual: "{{steps.summarize.output.summary}}"
+      expected: "Build typed mock mode."
+

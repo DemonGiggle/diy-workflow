@@ -60,6 +60,53 @@ test("executor runs workflow, resolves references, and saves trace", async () =>
   }
 });
 
+test("executor supports action-level mock mode for deterministic e2e runs", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-"));
+  try {
+    const workflow: WorkflowDocument = {
+      name: "mocked",
+      steps: [
+        {
+          id: "read",
+          type: "io.read_file",
+          input: { path: "missing.txt" },
+          config: { mock: { enabled: true, path: "mock://missing.txt", content: "Alpha. Beta.", bytes: 12 } },
+        },
+        {
+          id: "prompt",
+          type: "llm.prompt",
+          input: { prompt: "{{steps.read.output.content}}" },
+          config: { mock: { enabled: true, response: "Mock prompt output." } },
+        },
+        {
+          id: "summary",
+          type: "llm.summarize",
+          input: { text: "{{steps.prompt.output.text}}" },
+          config: { mock: { enabled: true, summary: "Mock summary.", sentenceCount: 1 } },
+        },
+        {
+          id: "eval",
+          type: "eval.exact_match",
+          input: { actual: "{{steps.summary.output.summary}}", expected: "Different" },
+          config: { mock: { enabled: true, matched: true, expected: "Mock summary." } },
+        },
+      ],
+    };
+    const trace = await new WorkflowExecutor().execute({
+      workflowPath: join(dir, "workflow.yaml"),
+      workflow,
+      registry: createDefaultRegistry(),
+      traceStore: new TraceStore(join(dir, "runs")),
+    });
+    assert.equal(trace.status, "success");
+    assert.deepEqual(trace.steps.map((step) => step.status), ["success", "success", "success", "success"]);
+    assert.deepEqual(trace.steps[0]?.output, { path: "mock://missing.txt", content: "Alpha. Beta.", bytes: 12 });
+    assert.deepEqual(trace.steps[3]?.output, { matched: true, actual: "Mock summary.", expected: "Mock summary." });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("fanout and fanin compose branch outputs", async () => {
   const dir = await mkdtemp(join(tmpdir(), "diy-workflow-"));
   try {
@@ -91,4 +138,3 @@ test("fanout and fanin compose branch outputs", async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
-

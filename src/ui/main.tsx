@@ -308,6 +308,8 @@ function FieldEditor({ field, value, connections, onChange, onConnect }: {
       <span>{field.label}{field.required ? " *" : ""}</span>
       {field.kind === "textarea" ? (
         <textarea value={stringValue(value)} placeholder={field.placeholder} onChange={(event) => onChange(event.target.value)} />
+      ) : field.kind === "boolean" ? (
+        <input type="checkbox" checked={value === true} onChange={(event) => onChange(event.target.checked)} />
       ) : field.kind === "number" ? (
         <input type="number" value={value === undefined ? "" : String(value)} placeholder={field.placeholder} onChange={(event) => onChange(event.target.value === "" ? undefined : Number(event.target.value))} />
       ) : field.kind === "json" || field.kind === "array" ? (
@@ -372,7 +374,10 @@ function EmptyInspector() {
 }
 
 function readField(value: unknown, field: string): unknown {
-  return value && typeof value === "object" && field in value ? (value as Record<string, unknown>)[field] : undefined;
+  return field.split(".").reduce<unknown>((current, part) => {
+    if (!current || typeof current !== "object" || !(part in current)) return undefined;
+    return (current as Record<string, unknown>)[part];
+  }, value);
 }
 
 function stringValue(value: unknown): string {

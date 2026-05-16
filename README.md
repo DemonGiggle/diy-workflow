@@ -102,6 +102,33 @@ node dist/cli.js run examples/llm-review.yaml
 
 It reads requirements from `examples/input.txt`, sends them through `llm.prompt`, summarizes the generated plan with `llm.summarize`, and checks the summary with `eval.exact_match`.
 
+## Mock mode
+
+Every built-in action supports action-level mock mode through `config.mock.enabled`. Mock settings stay out of `input`, so the action input schema still describes the real workflow contract while tests and UI runs can opt into deterministic outputs.
+
+```yaml
+steps:
+  - id: read
+    type: io.read_file
+    input:
+      path: does-not-need-to-exist.txt
+    config:
+      mock:
+        enabled: true
+        path: mock://requirements.txt
+        content: Mocked file content
+        bytes: 19
+```
+
+Run the end-to-end mock example:
+
+```sh
+node dist/cli.js validate examples/mock-e2e.yaml
+node dist/cli.js run examples/mock-e2e.yaml
+```
+
+The editor exposes each action's mock settings in the config panel, including a checkbox for `mock.enabled`.
+
 ## Architecture
 
 - `ActionDefinition`: reusable typed building block with `type`, input schema, output schema, optional config schema, and `run(input, context)`.
