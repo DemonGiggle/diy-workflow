@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { createDefaultRegistry } from "./actions/index.js";
 import { WorkflowExecutor } from "./executor.js";
 import { loadWorkflow } from "./loader.js";
+import { createWorkflowServer } from "./server.js";
 import { TraceStore } from "./trace.js";
 import { WorkflowValidator } from "./validator.js";
 
@@ -69,6 +70,23 @@ runs
     });
   });
 
+program
+  .command("serve")
+  .description("Serve the visual editor and workflow run API")
+  .option("-p, --port <port>", "HTTP port", "4173")
+  .option("--host <host>", "HTTP host", "127.0.0.1")
+  .action(async (options: { port: string; host: string }) => {
+    await runCli(async () => {
+      const port = Number(options.port);
+      if (!Number.isInteger(port) || port <= 0) throw new Error(`Invalid port: ${options.port}`);
+
+      const server = createWorkflowServer();
+      server.listen(port, options.host, () => {
+        console.log(`diy-workflow editor: http://${options.host}:${port}/`);
+      });
+    });
+  });
+
 await program.parseAsync(process.argv);
 
 async function runCli(fn: () => Promise<void>): Promise<void> {
@@ -79,4 +97,3 @@ async function runCli(fn: () => Promise<void>): Promise<void> {
     process.exitCode = 1;
   }
 }
-

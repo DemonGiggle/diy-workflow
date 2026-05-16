@@ -10,8 +10,9 @@
     "build": "tsc -p tsconfig.json",
     "build:ui": "vite build",
     "dev": "vite --host 0.0.0.0",
+    "serve": "node dist/cli.js serve",
     "start": "node dist/cli.js",
-    "test": "node --test dist/**/*.test.js",
+    "test": "node --test dist/*.test.js dist/**/*.test.js",
     "check": "npm run build && npm test && npm run build:ui"
   },
   "dependencies": {

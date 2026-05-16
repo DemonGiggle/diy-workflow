@@ -1,13 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Cable, CirclePlay, Copy, FileCode2, Grip, Plus, Trash2 } from "lucide-react";
 import YAML from "yaml";
-import type { StepTrace, WorkflowStep } from "../types.js";
+import type { RunTrace, WorkflowStep } from "../types.js";
 import { editorActions, getEditorAction, type EditorActionDefinition, type FieldDescriptor } from "./actionCatalog.js";
 import {
   addStep,
   availableConnections,
-  buildMockTrace,
   connectField,
   createInitialEditorState,
   moveStep,
@@ -16,13 +15,47 @@ import {
   updateStepInput,
   type EditorState,
 } from "./editorModel.js";
+import { listRuns, runWorkflow, showRun } from "./apiClient.js";
 import "./styles.css";
 
 function App() {
   const [state, setState] = useState<EditorState>(() => createInitialEditorState());
-  const [trace, setTrace] = useState<StepTrace[]>([]);
+  const [trace, setTrace] = useState<RunTrace | null>(null);
+  const [runs, setRuns] = useState<string[]>([]);
+  const [statusMessage, setStatusMessage] = useState<string>("Ready");
+  const [isRunning, setIsRunning] = useState(false);
   const selectedStep = state.workflow.steps.find((step) => step.id === state.selectedStepId) ?? state.workflow.steps[0] ?? null;
   const yaml = useMemo(() => YAML.stringify(state.workflow), [state.workflow]);
+
+  useEffect(() => {
+    void refreshRuns(setRuns, setStatusMessage);
+  }, []);
+
+  async function executeWorkflow() {
+    setIsRunning(true);
+    setStatusMessage("Running workflow...");
+    try {
+      const nextTrace = await runWorkflow(state.workflow);
+      setTrace(nextTrace);
+      setStatusMessage(`${nextTrace.status.toUpperCase()} ${nextTrace.runId}`);
+      await refreshRuns(setRuns, setStatusMessage, false);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
+  async function inspectRun(runId: string) {
+    setStatusMessage(`Loading ${runId}...`);
+    try {
+      const nextTrace = await showRun(runId);
+      setTrace(nextTrace);
+      setStatusMessage(`${nextTrace.status.toUpperCase()} ${nextTrace.runId}`);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
 
   return (
     <main className="app-shell">
@@ -33,7 +66,7 @@ function App() {
         </div>
         <div className="topbar-actions">
           <button className="secondary" onClick={() => navigator.clipboard?.writeText(yaml)}><Copy size={16}/> Copy YAML</button>
-          <button onClick={() => setTrace(buildMockTrace(state.workflow))}><CirclePlay size={16}/> Preview Run</button>
+          <button onClick={executeWorkflow} disabled={isRunning}><CirclePlay size={16}/> {isRunning ? "Running" : "Run Workflow"}</button>
         </div>
       </header>
 
@@ -43,11 +76,22 @@ function App() {
         <aside className="side-panel">
           {selectedStep ? <Inspector state={state} step={selectedStep} setState={setState} /> : <EmptyInspector />}
           <YamlPanel yaml={yaml} />
-          <TracePanel trace={trace} />
+          <TracePanel trace={trace} runs={runs} statusMessage={statusMessage} onRefresh={() => refreshRuns(setRuns, setStatusMessage)} onShowRun={inspectRun} />
         </aside>
       </section>
     </main>
   );
+}
+
+async function refreshRuns(setRuns: (runs: string[]) => void, setStatusMessage: (message: string) => void, reportSuccess = true): Promise<void> {
+  try {
+    const nextRuns = await listRuns();
+    setRuns(nextRuns);
+    if (reportSuccess) setStatusMessage(nextRuns.length ? `${nextRuns.length} saved run(s)` : "No saved runs yet");
+  } catch {
+    setRuns([]);
+    setStatusMessage("Run API unavailable. Use diy-workflow serve after building the UI.");
+  }
 }
 
 function ActionPalette({ onAdd }: { onAdd: (type: string) => void }) {
@@ -241,16 +285,32 @@ function YamlPanel({ yaml }: { yaml: string }) {
   return <section className="yaml-panel"><h2>YAML</h2><pre>{yaml}</pre></section>;
 }
 
-function TracePanel({ trace }: { trace: StepTrace[] }) {
+function TracePanel({ trace, runs, statusMessage, onRefresh, onShowRun }: {
+  trace: RunTrace | null;
+  runs: string[];
+  statusMessage: string;
+  onRefresh: () => void;
+  onShowRun: (runId: string) => void;
+}) {
   return (
     <section className="trace-panel">
-      <div className="panel-heading"><Cable size={16}/><h2>Preview Trace</h2></div>
-      {trace.length === 0 ? <p className="muted">Run a preview to inspect step status, outputs, errors, and metrics.</p> : trace.map((step) => (
-        <details key={step.id} open>
-          <summary>{step.status.toUpperCase()} {step.id} <span>{step.metrics.durationMs}ms</span></summary>
-          <pre>{JSON.stringify({ input: step.input, output: step.output, error: step.error }, null, 2)}</pre>
-        </details>
-      ))}
+      <div className="panel-heading"><Cable size={16}/><h2>Runs</h2></div>
+      <p className="muted">{statusMessage}</p>
+      <div className="run-list">
+        <button className="secondary small" onClick={onRefresh}>Refresh</button>
+        {runs.map((runId) => <button key={runId} className="run-pill" onClick={() => onShowRun(runId)}>{runId}</button>)}
+      </div>
+      {!trace ? <p className="muted">Run the workflow or select a saved run to inspect step status, outputs, errors, and metrics.</p> : (
+        <>
+          <h3>{trace.runId} · {trace.status}</h3>
+          {trace.steps.map((step) => (
+            <details key={step.id} open>
+              <summary>{step.status.toUpperCase()} {step.id} <span>{step.metrics.durationMs}ms</span></summary>
+              <pre>{JSON.stringify({ input: step.input, output: step.output, error: step.error }, null, 2)}</pre>
+            </details>
+          ))}
+        </>
+      )}
     </section>
   );
 }
