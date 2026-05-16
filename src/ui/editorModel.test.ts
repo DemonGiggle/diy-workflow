@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addStep, availableConnections, connectField, createInitialEditorState, moveStep, removeStep, updateStepInput } from "./editorModel.js";
+import { addStep, availableConnections, connectField, createInitialEditorState, isCompatibleConnection, moveStep, removeStep, updateStepInput } from "./editorModel.js";
 
 test("editor model adds, moves, and removes nodes", () => {
   let state = createInitialEditorState();
@@ -26,6 +26,29 @@ test("editor model builds schema-style upstream references", () => {
 
   state = connectField(state, summarize.id, "text", read.id, "content");
   assert.deepEqual(summarizeInput(state), `{{steps.${read.id}.output.content}}`);
+});
+
+test("editor model filters upstream connections by compatible field kind", () => {
+  let state = createInitialEditorState();
+  state = addStep(state, "eval.exact_match");
+  const exactMatch = state.workflow.steps.at(-1)!;
+  const actualField = { name: "actual", label: "Actual", kind: "json" as const, connectable: true };
+  const jsonConnections = availableConnections(state, exactMatch.id, actualField);
+  assert.ok(jsonConnections.some((connection) => connection.field.name === "bytes"));
+
+  const summarize = state.workflow.steps[1]!;
+  const textField = { name: "text", label: "Text", kind: "textarea" as const, connectable: true };
+  const textConnections = availableConnections(state, summarize.id, textField);
+  assert.ok(textConnections.some((connection) => connection.field.name === "content"));
+  assert.equal(textConnections.some((connection) => connection.field.name === "bytes"), false);
+});
+
+test("editor model exposes compatibility rules for UI wiring", () => {
+  assert.equal(isCompatibleConnection("textarea", "textarea"), true);
+  assert.equal(isCompatibleConnection("number", "textarea"), false);
+  assert.equal(isCompatibleConnection("number", "json"), true);
+  assert.equal(isCompatibleConnection("array", "array"), true);
+  assert.equal(isCompatibleConnection("boolean", "number"), false);
 });
 
 test("editor model updates primitive field input", () => {

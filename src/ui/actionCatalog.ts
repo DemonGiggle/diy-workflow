@@ -3,10 +3,18 @@ import type { JsonObject, WorkflowStep } from "../types.js";
 export interface FieldDescriptor {
   name: string;
   label: string;
-  kind: "text" | "textarea" | "number" | "json" | "array";
+  kind: FieldKind;
   required?: boolean;
   connectable?: boolean;
   placeholder?: string;
+}
+
+export type FieldKind = "text" | "textarea" | "number" | "boolean" | "json" | "array";
+
+export interface OutputDescriptor {
+  name: string;
+  label: string;
+  kind: FieldKind;
 }
 
 export interface EditorActionDefinition {
@@ -16,7 +24,7 @@ export interface EditorActionDefinition {
   description: string;
   inputFields: FieldDescriptor[];
   configFields: FieldDescriptor[];
-  outputFields: string[];
+  outputFields: OutputDescriptor[];
   createInput(): unknown;
   createConfig?(): JsonObject;
 }
@@ -29,7 +37,11 @@ export const editorActions: EditorActionDefinition[] = [
     description: "Read a text file and emit content, path, and byte count.",
     inputFields: [{ name: "path", label: "Path", kind: "text", required: true, placeholder: "input.txt" }],
     configFields: [],
-    outputFields: ["path", "content", "bytes"],
+    outputFields: [
+      { name: "path", label: "Path", kind: "text" },
+      { name: "content", label: "Content", kind: "textarea" },
+      { name: "bytes", label: "Bytes", kind: "number" },
+    ],
     createInput: () => ({ path: "input.txt" }),
   },
   {
@@ -39,7 +51,10 @@ export const editorActions: EditorActionDefinition[] = [
     description: "Prompt an AI model. MVP uses deterministic mock output.",
     inputFields: [{ name: "prompt", label: "Prompt", kind: "textarea", required: true, connectable: true, placeholder: "Write a concise answer about {{input}}" }],
     configFields: [{ name: "mockResponse", label: "Mock response", kind: "textarea", placeholder: "Optional deterministic response" }],
-    outputFields: ["text", "provider"],
+    outputFields: [
+      { name: "text", label: "Text", kind: "textarea" },
+      { name: "provider", label: "Provider", kind: "text" },
+    ],
     createInput: () => ({ prompt: "" }),
     createConfig: () => ({}),
   },
@@ -53,7 +68,10 @@ export const editorActions: EditorActionDefinition[] = [
       { name: "maxSentences", label: "Max sentences", kind: "number", placeholder: "3" },
       { name: "maxChars", label: "Max characters", kind: "number" },
     ],
-    outputFields: ["summary", "sentenceCount"],
+    outputFields: [
+      { name: "summary", label: "Summary", kind: "textarea" },
+      { name: "sentenceCount", label: "Sentence count", kind: "number" },
+    ],
     createInput: () => ({ text: "" }),
     createConfig: () => ({ maxSentences: 3 }),
   },
@@ -67,7 +85,7 @@ export const editorActions: EditorActionDefinition[] = [
       { name: "branches", label: "Branches", kind: "array", required: true },
     ],
     configFields: [],
-    outputFields: ["results"],
+    outputFields: [{ name: "results", label: "Results", kind: "array" }],
     createInput: () => ({ value: {}, branches: [] }),
   },
   {
@@ -77,7 +95,11 @@ export const editorActions: EditorActionDefinition[] = [
     description: "Merge fanout outputs.",
     inputFields: [{ name: "items", label: "Items", kind: "json", required: true, connectable: true }],
     configFields: [{ name: "strategy", label: "Strategy", kind: "text", placeholder: "merge | first_success" }],
-    outputFields: ["strategy", "output", "count"],
+    outputFields: [
+      { name: "strategy", label: "Strategy", kind: "text" },
+      { name: "output", label: "Output", kind: "json" },
+      { name: "count", label: "Count", kind: "number" },
+    ],
     createInput: () => ({ items: [] }),
     createConfig: () => ({ strategy: "merge" }),
   },
@@ -91,7 +113,11 @@ export const editorActions: EditorActionDefinition[] = [
       { name: "expected", label: "Expected", kind: "json", required: true, connectable: true },
     ],
     configFields: [],
-    outputFields: ["matched", "actual", "expected"],
+    outputFields: [
+      { name: "matched", label: "Matched", kind: "boolean" },
+      { name: "actual", label: "Actual", kind: "json" },
+      { name: "expected", label: "Expected", kind: "json" },
+    ],
     createInput: () => ({ actual: "", expected: "" }),
   },
 ];
@@ -107,4 +133,3 @@ export function createStep(type: string, index: number): WorkflowStep {
   const config = action.createConfig?.();
   return { id, type, input: action.createInput(), ...(config ? { config } : {}) };
 }
-

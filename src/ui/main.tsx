@@ -123,8 +123,14 @@ function Canvas({ state, setState }: { state: EditorState; setState: React.Dispa
             <h3>{action?.label ?? step.type}</h3>
             <code>{step.id}</code>
             <div className="node-io">
-              <span>input</span>
-              <span>output</span>
+              <div>
+                <span>input</span>
+                {(action?.inputFields ?? []).map((field) => <code key={field.name} className="port input-port">{field.name}</code>)}
+              </div>
+              <div>
+                <span>output</span>
+                {(action?.outputFields ?? []).map((field) => <code key={field.name} className="port output-port">{field.name}</code>)}
+              </div>
             </div>
           </article>
         );
@@ -143,7 +149,7 @@ function Connections({ state }: { state: EditorState }) {
       {lines.map((line, index) => {
         const from = state.positions[line.from] ?? { x: 0, y: 0 };
         const to = state.positions[line.to] ?? { x: 0, y: 0 };
-        const x1 = from.x + 240;
+        const x1 = from.x + 270;
         const y1 = from.y + 64;
         const x2 = to.x;
         const y2 = to.y + 64;
@@ -155,7 +161,6 @@ function Connections({ state }: { state: EditorState }) {
 
 function Inspector({ state, step, setState }: { state: EditorState; step: WorkflowStep; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
   const action = getEditorAction(step.type);
-  const connections = availableConnections(state, step.id);
   if (!action) return null;
   return (
     <section className="inspector">
@@ -173,7 +178,7 @@ function Inspector({ state, step, setState }: { state: EditorState; step: Workfl
           key={field.name}
           field={field}
           value={readField(step.input, field.name)}
-          connections={connections}
+          connections={availableConnections(state, step.id, field)}
           onChange={(value) => setState((current) => updateStepInput(current, step.id, field.name, value))}
           onConnect={(sourceStep, sourceField) => setState((current) => connectField(current, step.id, field.name, sourceStep, sourceField))}
         />
@@ -189,7 +194,7 @@ function Inspector({ state, step, setState }: { state: EditorState; step: Workfl
         />
       ))}
       <h3>Outputs</h3>
-      <div className="output-list">{action.outputFields.map((field) => <code key={field}>{field}</code>)}</div>
+      <div className="output-list">{action.outputFields.map((field) => <code key={field.name}>{field.name}<span>{field.kind}</span></code>)}</div>
       <button className="danger" onClick={() => setState((current) => removeStep(current, step.id))}><Trash2 size={15}/> Delete step</button>
     </section>
   );
@@ -198,7 +203,7 @@ function Inspector({ state, step, setState }: { state: EditorState; step: Workfl
 function FieldEditor({ field, value, connections, onChange, onConnect }: {
   field: FieldDescriptor;
   value: unknown;
-  connections: Array<{ fromStepId: string; field: string; reference: string }>;
+  connections: Array<{ fromStepId: string; field: { name: string; kind: string }; reference: string }>;
   onChange: (value: unknown) => void;
   onConnect?: (stepId: string, field: string) => void;
 }) {
@@ -221,7 +226,11 @@ function FieldEditor({ field, value, connections, onChange, onConnect }: {
           event.currentTarget.value = "";
         }}>
           <option value="">Connect upstream output...</option>
-          {connections.map((connection) => <option key={connection.reference} value={`${connection.fromStepId}:${connection.field}`}>{connection.fromStepId}.{connection.field}</option>)}
+          {connections.map((connection) => (
+            <option key={connection.reference} value={`${connection.fromStepId}:${connection.field.name}`}>
+              {connection.fromStepId}.{connection.field.name} ({connection.field.kind})
+            </option>
+          ))}
         </select>
       )}
     </label>

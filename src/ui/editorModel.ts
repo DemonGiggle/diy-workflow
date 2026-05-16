@@ -1,5 +1,5 @@
 import type { JsonObject, StepTrace, WorkflowDocument, WorkflowStep } from "../types.js";
-import { createStep, getEditorAction } from "./actionCatalog.js";
+import { createStep, getEditorAction, type FieldDescriptor, type FieldKind, type OutputDescriptor } from "./actionCatalog.js";
 
 export interface NodePosition {
   x: number;
@@ -14,8 +14,9 @@ export interface EditorState {
 
 export interface ConnectionCandidate {
   fromStepId: string;
-  field: string;
+  field: OutputDescriptor;
   reference: string;
+  compatible: boolean;
 }
 
 export function createInitialEditorState(): EditorState {
@@ -81,13 +82,30 @@ export function connectField(state: EditorState, targetStepId: string, targetFie
   return updateStepInput(state, targetStepId, targetField, referenceFor(sourceStepId, sourceField));
 }
 
-export function availableConnections(state: EditorState, targetStepId: string): ConnectionCandidate[] {
+export function availableConnections(state: EditorState, targetStepId: string, targetField?: FieldDescriptor): ConnectionCandidate[] {
   const targetIndex = state.workflow.steps.findIndex((step) => step.id === targetStepId);
   if (targetIndex < 0) return [];
   return state.workflow.steps.slice(0, targetIndex).flatMap((step) => {
     const action = getEditorAction(step.type);
-    return (action?.outputFields ?? []).map((field) => ({ fromStepId: step.id, field, reference: referenceFor(step.id, field) }));
+    return (action?.outputFields ?? [])
+      .map((field) => ({
+        fromStepId: step.id,
+        field,
+        reference: referenceFor(step.id, field.name),
+        compatible: !targetField || isCompatibleConnection(field.kind, targetField.kind),
+      }))
+      .filter((connection) => connection.compatible);
   });
+}
+
+export function isCompatibleConnection(sourceKind: FieldKind, targetKind: FieldKind): boolean {
+  if (targetKind === "json") return true;
+  if (targetKind === "textarea") return sourceKind === "textarea" || sourceKind === "text" || sourceKind === "json";
+  if (targetKind === "text") return sourceKind === "text" || sourceKind === "textarea" || sourceKind === "number" || sourceKind === "boolean";
+  if (targetKind === "array") return sourceKind === "array";
+  if (targetKind === "number") return sourceKind === "number";
+  if (targetKind === "boolean") return sourceKind === "boolean";
+  return false;
 }
 
 export function referenceFor(stepId: string, field: string): string {
@@ -134,4 +152,3 @@ function pruneEmpty(value: JsonObject): JsonObject | undefined {
   const entries = Object.entries(value).filter(([, item]) => item !== "" && item !== undefined);
   return entries.length ? Object.fromEntries(entries) : undefined;
 }
-
