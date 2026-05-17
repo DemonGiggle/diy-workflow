@@ -14,7 +14,7 @@ This page is an index. Detailed behavior, input/output fields, mock settings, an
 
 | Type | Purpose | Reference |
 | --- | --- | --- |
-| `io.read_file` | Read a text file from the local workspace. | [io.read_file](action-reference/io.read_file.md) |
+| `io.read_file` | Read a local file and extract text from common document formats. | [io.read_file](action-reference/io.read_file.md) |
 | `llm.prompt` | Render and run a prompt through the MVP mock LLM provider. | [llm.prompt](action-reference/llm.prompt.md) |
 | `llm.summarize` | Summarize text with deterministic extractive summarization. | [llm.summarize](action-reference/llm.summarize.md) |
 | `control.fanout` | Run multiple action branches with the same ambient input value. | [control.fanout](action-reference/control.fanout.md) |

@@ -1,5 +1,8 @@
 import { readFile, stat } from "node:fs/promises";
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
+import mammoth from "mammoth";
+import { PDFParse } from "pdf-parse";
+import * as XLSX from "xlsx";
 import type { ActionDefinition } from "../types.js";
 import { readMockConfig } from "./mock.js";
 
@@ -14,9 +17,44 @@ interface ReadFileOutput {
   bytes: number;
 }
 
+const binaryTextExtensions = new Set([".docx", ".pdf", ".xlsx", ".xls", ".xlsm", ".xlsb"]);
+
+async function extractTextFromFile(absolutePath: string, encoding: BufferEncoding): Promise<string> {
+  const extension = extname(absolutePath).toLowerCase();
+  if (!binaryTextExtensions.has(extension)) {
+    return readFile(absolutePath, encoding);
+  }
+
+  const buffer = await readFile(absolutePath);
+  if (extension === ".docx") {
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value;
+  }
+  if (extension === ".pdf") {
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const result = await parser.getText();
+      return result.text;
+    } finally {
+      await parser.destroy();
+    }
+  }
+
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const sheetTexts = workbook.SheetNames.map((sheetName) => {
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) {
+      return `# ${sheetName}`;
+    }
+    const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+    return csv.trim().length > 0 ? `# ${sheetName}\n${csv.trimEnd()}` : `# ${sheetName}`;
+  });
+  return sheetTexts.join("\n\n");
+}
+
 export const readFileAction: ActionDefinition<ReadFileInput, ReadFileOutput> = {
   type: "io.read_file",
-  description: "Read a UTF-8 text file from the local workspace.",
+  description: "Read a local file and extract text from text, PDF, Word, or Excel files.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -66,7 +104,7 @@ export const readFileAction: ActionDefinition<ReadFileInput, ReadFileOutput> = {
 
     const encoding = input.encoding ?? "utf8";
     const absolute = resolve(context.cwd, input.path);
-    const [content, info] = await Promise.all([readFile(absolute, encoding), stat(absolute)]);
+    const [content, info] = await Promise.all([extractTextFromFile(absolute, encoding), stat(absolute)]);
     return { path: absolute, content, bytes: info.size };
   },
 };

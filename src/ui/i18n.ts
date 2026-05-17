@@ -95,7 +95,7 @@ export const resources: Record<Locale, LocaleResources> = {
     actions: {
       "io.read_file": {
         label: "Read File",
-        description: "Read a text file and emit content, path, and byte count.",
+        description: "Read a local file and emit extracted text, path, and byte count.",
         inputFields: { path: { label: "Path", placeholder: "input.txt" } },
         configFields: {
           "mock.enabled": { label: "Mock mode" },
@@ -226,7 +226,7 @@ export const resources: Record<Locale, LocaleResources> = {
     actions: {
       "io.read_file": {
         label: "讀取檔案",
-        description: "讀取文字檔，輸出內容、路徑與位元組數。",
+        description: "讀取本機檔案，輸出擷取的文字、路徑與位元組數。",
         inputFields: { path: { label: "路徑", placeholder: "input.txt" } },
         configFields: {
           "mock.enabled": { label: "Mock 模式" },

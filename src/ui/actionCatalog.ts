@@ -34,7 +34,7 @@ export const editorActions: EditorActionDefinition[] = [
     type: "io.read_file",
     namespace: "io",
     label: "Read File",
-    description: "Read a text file and emit content, path, and byte count.",
+    description: "Read a local file and emit extracted text, path, and byte count.",
     inputFields: [{ name: "path", label: "Path", kind: "text", required: true, placeholder: "input.txt" }],
     configFields: [
       { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
