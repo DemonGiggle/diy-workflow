@@ -9,6 +9,9 @@ import { exactMatchAction } from "./actions/eval.js";
 import { readFileAction } from "./actions/io.js";
 import { promptAction, summarizeAction } from "./actions/llm.js";
 import type { ActionContext } from "./types.js";
+import { Document, Packer, Paragraph } from "docx";
+import PDFDocument from "pdfkit";
+import * as XLSX from "xlsx";
 
 const registry = createDefaultRegistry();
 
@@ -42,6 +45,45 @@ test("read_file reads workspace-relative files and supports mock output", async 
       { mock: { enabled: true, path: "mock://file.txt", content: "Mocked", bytes: 6 } },
     );
     assert.deepEqual(mocked, { path: "mock://file.txt", content: "Mocked", bytes: 6 });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("read_file extracts text from docx, pdf, and excel files", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-docs-"));
+  try {
+    await writeFile(
+      join(dir, "input.docx"),
+      await Packer.toBuffer(new Document({ sections: [{ children: [new Paragraph("Hello docx"), new Paragraph("Second line")] }] })),
+    );
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ["Name", "Value"],
+        ["Alpha", "One"],
+        ["Beta", "Two"],
+      ]),
+      "Sheet1",
+    );
+    await writeFile(join(dir, "input.xlsx"), XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
+
+    await writeFile(join(dir, "input.pdf"), await createPdfBuffer(["Hello pdf", "Second page line"]));
+
+    const docxOutput = await readFileAction.run({ path: "input.docx" }, context(dir));
+    assert.match(docxOutput.content, /Hello docx/);
+    assert.match(docxOutput.content, /Second line/);
+
+    const excelOutput = await readFileAction.run({ path: "input.xlsx" }, context(dir));
+    assert.match(excelOutput.content, /# Sheet1/);
+    assert.match(excelOutput.content, /Alpha,One/);
+    assert.match(excelOutput.content, /Beta,Two/);
+
+    const pdfOutput = await readFileAction.run({ path: "input.pdf" }, context(dir));
+    assert.match(pdfOutput.content, /Hello pdf/);
+    assert.match(pdfOutput.content, /Second page line/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -130,3 +172,19 @@ test("exact_match compares nested values and can force mock output", async () =>
   );
   assert.deepEqual(mocked, { matched: true, actual: "same", expected: "same" });
 });
+
+async function createPdfBuffer(lines: string[]): Promise<Buffer> {
+  return await new Promise<Buffer>((resolvePromise, rejectPromise) => {
+    const doc = new PDFDocument({ margin: 36, size: "A4" });
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk: Uint8Array) => chunks.push(Buffer.from(chunk)));
+    doc.on("error", rejectPromise);
+    doc.on("end", () => resolvePromise(Buffer.concat(chunks)));
+
+    doc.fontSize(12);
+    for (const line of lines) {
+      doc.text(line);
+    }
+    doc.end();
+  });
+}
