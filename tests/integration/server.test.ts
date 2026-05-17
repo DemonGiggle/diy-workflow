@@ -77,6 +77,60 @@ test("workflow server validates workflow requests", async () => {
   }
 });
 
+test("workflow server assigns distinct run ids to concurrent workflow runs", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-server-concurrent-"));
+  const webRoot = join(dir, "web-dist");
+  const traceRoot = join(dir, "runs");
+  await mkdir(webRoot, { recursive: true });
+  await writeFile(join(webRoot, "index.html"), "<main>diy-workflow</main>", "utf8");
+
+  const server = createWorkflowServer({ cwd: dir, webRoot, traceRoot });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+  try {
+    const workflow: WorkflowDocument = {
+      name: "concurrent-server-test",
+      steps: [
+        {
+          id: "prompt",
+          type: "llm.prompt",
+          input: { prompt: "hello" },
+          config: { mockResponse: "world" },
+        },
+      ],
+    };
+
+    const [firstResponse, secondResponse] = await Promise.all([
+      fetch(`${baseUrl}/api/workflows/run`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workflow }),
+      }),
+      fetch(`${baseUrl}/api/workflows/run`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workflow }),
+      }),
+    ]);
+
+    assert.equal(firstResponse.ok, true);
+    assert.equal(secondResponse.ok, true);
+
+    const [firstTrace, secondTrace] = await Promise.all([
+      firstResponse.json() as Promise<RunTrace>,
+      secondResponse.json() as Promise<RunTrace>,
+    ]);
+    assert.notEqual(firstTrace.runId, secondTrace.runId);
+
+    const listResponse = await fetch(`${baseUrl}/api/runs`);
+    const runs = await listResponse.json() as { runs: string[] };
+    assert.deepEqual(runs.runs.sort(), [firstTrace.runId, secondTrace.runId].sort());
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test("workflow server serves built UI from package root when cwd differs", async () => {
   const dir = await mkdtemp(join(tmpdir(), "diy-workflow-server-cwd-"));
   await mkdir(resolve("dist-test", "web-dist"), { recursive: true });
