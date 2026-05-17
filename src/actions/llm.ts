@@ -8,7 +8,6 @@ interface PromptInput {
 
 interface PromptOutput {
   text: string;
-  provider: "mock";
 }
 
 interface SummarizeInput {
@@ -35,10 +34,9 @@ export const promptAction: ActionDefinition<PromptInput, PromptOutput> = {
   outputSchema: {
     type: "object",
     additionalProperties: false,
-    required: ["text", "provider"],
+    required: ["text"],
     properties: {
       text: { type: "string" },
-      provider: { type: "string", const: "mock" },
     },
   },
   configSchema: {
@@ -65,7 +63,7 @@ export const promptAction: ActionDefinition<PromptInput, PromptOutput> = {
         ? config.mockResponse
         : undefined;
     const text = mockResponse ?? renderPrompt(input.prompt, input.variables ?? {});
-    return { text, provider: "mock" };
+    return { text };
   },
 };
 

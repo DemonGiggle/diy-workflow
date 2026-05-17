@@ -188,7 +188,7 @@ export function buildMockTrace(workflow: WorkflowDocument): StepTrace[] {
 function mockOutputFor(step: WorkflowStep, index: number): unknown {
   switch (step.type) {
     case "io.read_file": return { path: asObject(step.input).path ?? "input.txt", content: "Preview file content", bytes: 20 };
-    case "llm.prompt": return { text: asObject(step.input).prompt || "Preview prompt response", provider: "mock" };
+    case "llm.prompt": return { text: asObject(step.input).prompt || "Preview prompt response" };
     case "llm.summarize": return { summary: "Preview summary", sentenceCount: 2 };
     case "control.fanout": return { results: [] };
     case "control.fanin": return { strategy: asObject(step.config).strategy ?? "merge", output: [], count: 0 };

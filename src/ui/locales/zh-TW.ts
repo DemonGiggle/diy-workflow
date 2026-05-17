@@ -61,7 +61,6 @@ export const zhTw: LocaleResources = {
       },
       outputFields: {
         text: { label: "文字" },
-        provider: { label: "Provider" },
       },
     },
     "llm.summarize": {
