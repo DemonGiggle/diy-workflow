@@ -1,0 +1,133 @@
+import type { LocaleResources } from "./types.js";
+
+export const zhTw: LocaleResources = {
+  localeName: "繁體中文",
+  ui: {
+    "app.subtitle": "視覺化編輯器預覽",
+    "actions.title": "動作",
+    "common.config": "設定",
+    "common.input": "輸入",
+    "common.inputs": "輸入",
+    "common.output": "輸出",
+    "common.outputs": "輸出",
+    "common.type": "類型",
+    "editor.connectOutput": "連接上游輸出...",
+    "editor.dragNode": "拖拉節點",
+    "editor.noSelection": "選取節點來編輯輸入、設定與連線。",
+    "editor.notConnectable": "這個輸入不能連線",
+    "field.requiredSuffix": " *",
+    "locale.label": "語言",
+    "run.copyYaml": "複製 YAML",
+    "run.empty": "目前沒有儲存的執行紀錄",
+    "run.loading": "載入 {runId}...",
+    "run.noSavedRuns": "目前沒有儲存的執行紀錄",
+    "run.ready": "就緒",
+    "run.refresh": "重新整理",
+    "run.runWorkflow": "執行 workflow",
+    "run.running": "執行中",
+    "run.runningWorkflow": "正在執行 workflow...",
+    "run.savedRuns": "已儲存 {count} 筆執行紀錄",
+    "run.title": "執行紀錄",
+    "run.unavailable": "Run API 無法使用。請先建置 UI 後執行 diy-workflow serve。",
+    "run.inspectHint": "執行 workflow 或選取已儲存紀錄，以檢視步驟狀態、輸出、錯誤與 metrics。",
+    "step.delete": "刪除步驟",
+    "step.id": "步驟 ID",
+    "yaml.title": "YAML",
+  },
+  actions: {
+    "io.read_file": {
+      label: "讀取檔案",
+      description: "讀取本機檔案，輸出擷取的文字、路徑與位元組數。",
+      inputFields: { path: { label: "路徑", placeholder: "input.txt" } },
+      configFields: {
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.path": { label: "Mock 路徑", placeholder: "mock/input.txt" },
+        "mock.content": { label: "Mock 內容", placeholder: "選填的檔案內容" },
+        "mock.bytes": { label: "Mock 位元組數" },
+      },
+      outputFields: {
+        path: { label: "路徑" },
+        content: { label: "內容" },
+        bytes: { label: "位元組數" },
+      },
+    },
+    "llm.prompt": {
+      label: "提示詞",
+      description: "向 AI model 發送 prompt。MVP 使用可重現的 mock 輸出。",
+      inputFields: { prompt: { label: "提示詞", placeholder: "請針對 {{input}} 寫出精簡回答" } },
+      configFields: {
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.response": { label: "Mock 回應", placeholder: "選填的固定回應" },
+      },
+      outputFields: {
+        text: { label: "文字" },
+        provider: { label: "Provider" },
+      },
+    },
+    "llm.summarize": {
+      label: "摘要",
+      description: "使用面向 model 的設定摘要文字。",
+      inputFields: { text: { label: "文字", placeholder: "貼上或連接文字" } },
+      configFields: {
+        maxSentences: { label: "最大句數", placeholder: "3" },
+        maxChars: { label: "最大字元數" },
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.summary": { label: "Mock 摘要" },
+        "mock.sentenceCount": { label: "Mock 句數" },
+      },
+      outputFields: {
+        summary: { label: "摘要" },
+        sentenceCount: { label: "句數" },
+      },
+    },
+    "control.fanout": {
+      label: "Fanout",
+      description: "用相同輸入執行多個分支。",
+      inputFields: {
+        value: { label: "值" },
+        branches: { label: "分支" },
+      },
+      configFields: {
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.results": { label: "Mock 結果" },
+      },
+      outputFields: { results: { label: "結果" } },
+    },
+    "control.fanin": {
+      label: "Fanin",
+      description: "合併 fanout 輸出。",
+      inputFields: { items: { label: "項目" } },
+      configFields: {
+        strategy: { label: "策略", placeholder: "merge | first_success" },
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.strategy": { label: "Mock 策略", placeholder: "merge | first_success" },
+        "mock.output": { label: "Mock 輸出" },
+        "mock.count": { label: "Mock 數量" },
+      },
+      outputFields: {
+        strategy: { label: "策略" },
+        output: { label: "輸出" },
+        count: { label: "數量" },
+      },
+    },
+    "eval.exact_match": {
+      label: "完全比對",
+      description: "精確比較兩個值。",
+      inputFields: {
+        actual: { label: "實際值" },
+        expected: { label: "預期值" },
+      },
+      configFields: {
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.matched": { label: "Mock 比對結果" },
+        "mock.actual": { label: "Mock 實際值" },
+        "mock.expected": { label: "Mock 預期值" },
+      },
+      outputFields: {
+        matched: { label: "是否符合" },
+        actual: { label: "實際值" },
+        expected: { label: "預期值" },
+      },
+    },
+  },
+};
