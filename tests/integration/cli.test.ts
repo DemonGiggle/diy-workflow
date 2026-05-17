@@ -106,7 +106,7 @@ test("CLI serve launches a real HTTP server for static UI and workflow API", asy
     assert.equal(run.status, 200);
     const trace = await run.json() as { runId: string; status: string; steps: Array<{ output: unknown }> };
     assert.equal(trace.status, "success");
-    assert.deepEqual(trace.steps[0]?.output, { text: "world", provider: "mock" });
+    assert.deepEqual(trace.steps[0]?.output, { text: "world" });
 
     const list = await fetch(`${baseUrl}/api/runs`);
     assert.deepEqual(await list.json(), { runs: [trace.runId] });

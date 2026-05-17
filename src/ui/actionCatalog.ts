@@ -61,7 +61,6 @@ export const editorActions: EditorActionDefinition[] = [
     ],
     outputFields: [
       { name: "text", label: "Text", kind: "textarea" },
-      { name: "provider", label: "Provider", kind: "text" },
     ],
     createInput: () => ({ prompt: "" }),
     createConfig: () => ({}),

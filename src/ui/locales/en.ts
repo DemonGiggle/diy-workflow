@@ -61,7 +61,6 @@ export const en: LocaleResources = {
       },
       outputFields: {
         text: { label: "Text" },
-        provider: { label: "Provider" },
       },
     },
     "llm.summarize": {

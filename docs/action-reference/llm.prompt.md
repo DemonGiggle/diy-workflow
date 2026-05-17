@@ -18,7 +18,6 @@ Renders and runs a prompt through the MVP mock LLM provider.
 | Field | Type | Description |
 | --- | --- | --- |
 | `text` | string | Rendered prompt response. |
-| `provider` | string | Current provider identifier. The MVP returns `mock`. |
 
 ## Config
 

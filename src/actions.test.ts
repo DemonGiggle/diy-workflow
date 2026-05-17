@@ -94,14 +94,14 @@ test("llm prompt renders variables and accepts mock response", async () => {
     { prompt: "Hello {{user.name}}", variables: { user: { name: "Gigo" } } },
     context(),
   );
-  assert.deepEqual(rendered, { text: "Hello Gigo", provider: "mock" });
+  assert.deepEqual(rendered, { text: "Hello Gigo" });
 
   const mocked = await promptAction.run(
     { prompt: "Ignored" },
     context(),
     { mock: { enabled: true, response: "Mock response" } },
   );
-  assert.deepEqual(mocked, { text: "Mock response", provider: "mock" });
+  assert.deepEqual(mocked, { text: "Mock response" });
 });
 
 test("llm summarize applies sentence and character limits and mock summary", async () => {
