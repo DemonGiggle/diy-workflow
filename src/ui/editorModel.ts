@@ -142,6 +142,8 @@ export function availableConnections(state: EditorState, targetStepId: string, t
 }
 
 export function isCompatibleConnection(sourceKind: FieldKind, targetKind: FieldKind): boolean {
+  if (sourceKind === "image") return targetKind === "image";
+  if (targetKind === "image") return false;
   if (targetKind === "json") return true;
   if (targetKind === "textarea") return sourceKind === "textarea" || sourceKind === "text" || sourceKind === "json";
   if (targetKind === "text") return sourceKind === "text" || sourceKind === "textarea" || sourceKind === "number" || sourceKind === "boolean";
@@ -188,7 +190,14 @@ export function buildMockTrace(workflow: WorkflowDocument): StepTrace[] {
 function mockOutputFor(step: WorkflowStep, index: number): unknown {
   switch (step.type) {
     case "io.read_file": return { path: asObject(step.input).path ?? "input.txt", content: "Preview file content", bytes: 20 };
+    case "io.read_image": {
+      const path = asObject(step.input).path ?? "input.png";
+      const image = { path, mimeType: "image/png", bytes: 128, width: 1, height: 1 };
+      return { ...image, image };
+    }
     case "llm.prompt": return { text: asObject(step.input).prompt || "Preview prompt response" };
+    case "llm.vision_analyze": return { text: "Preview image analysis" };
+    case "llm.ocr": return { text: "Preview OCR text" };
     case "llm.summarize": return { summary: "Preview summary", sentenceCount: 2 };
     case "control.fanout": return { results: [] };
     case "control.fanin": return { strategy: asObject(step.config).strategy ?? "merge", output: [], count: 0 };

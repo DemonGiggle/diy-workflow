@@ -51,10 +51,61 @@ export const en: LocaleResources = {
         bytes: { label: "Bytes" },
       },
     },
+    "io.read_image": {
+      label: "Read Image",
+      description: "Read a local image and emit a structured image artifact.",
+      inputFields: { path: { label: "Path", placeholder: "input.png" } },
+      configFields: {
+        "mock.enabled": { label: "Mock mode" },
+        "mock.path": { label: "Mock path", placeholder: "mock/input.png" },
+        "mock.mimeType": { label: "Mock MIME type", placeholder: "image/png" },
+        "mock.bytes": { label: "Mock bytes" },
+        "mock.width": { label: "Mock width" },
+        "mock.height": { label: "Mock height" },
+        "mock.image": { label: "Mock image" },
+      },
+      outputFields: {
+        path: { label: "Path" },
+        mimeType: { label: "MIME type" },
+        bytes: { label: "Bytes" },
+        width: { label: "Width" },
+        height: { label: "Height" },
+        image: { label: "Image" },
+      },
+    },
     "llm.prompt": {
       label: "Prompt",
       description: "Prompt an AI model. MVP uses deterministic mock output.",
       inputFields: { prompt: { label: "Prompt", placeholder: "Write a concise answer about {{input}}" } },
+      configFields: {
+        "mock.enabled": { label: "Mock mode" },
+        "mock.response": { label: "Mock response", placeholder: "Optional deterministic response" },
+      },
+      outputFields: {
+        text: { label: "Text" },
+      },
+    },
+    "llm.vision_analyze": {
+      label: "Vision Analyze",
+      description: "Analyze an image and describe what it contains.",
+      inputFields: {
+        image: { label: "Image" },
+        prompt: { label: "Prompt", placeholder: "Describe what matters in this image" },
+      },
+      configFields: {
+        "mock.enabled": { label: "Mock mode" },
+        "mock.response": { label: "Mock response", placeholder: "Optional deterministic response" },
+      },
+      outputFields: {
+        text: { label: "Text" },
+      },
+    },
+    "llm.ocr": {
+      label: "OCR",
+      description: "Extract text from an image.",
+      inputFields: {
+        image: { label: "Image" },
+      },
       configFields: {
         "mock.enabled": { label: "Mock mode" },
         "mock.response": { label: "Mock response", placeholder: "Optional deterministic response" },

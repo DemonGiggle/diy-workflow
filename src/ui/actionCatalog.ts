@@ -9,7 +9,7 @@ export interface FieldDescriptor {
   placeholder?: string;
 }
 
-export type FieldKind = "text" | "textarea" | "number" | "boolean" | "json" | "array";
+export type FieldKind = "text" | "textarea" | "number" | "boolean" | "json" | "array" | "image";
 
 export interface OutputDescriptor {
   name: string;
@@ -50,6 +50,31 @@ export const editorActions: EditorActionDefinition[] = [
     createInput: () => ({ path: "input.txt" }),
   },
   {
+    type: "io.read_image",
+    namespace: "io",
+    label: "Read Image",
+    description: "Read a local image and emit a structured image artifact.",
+    inputFields: [{ name: "path", label: "Path", kind: "text", required: true, placeholder: "input.png" }],
+    configFields: [
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.path", label: "Mock path", kind: "text", placeholder: "mock/input.png" },
+      { name: "mock.mimeType", label: "Mock MIME type", kind: "text", placeholder: "image/png" },
+      { name: "mock.bytes", label: "Mock bytes", kind: "number" },
+      { name: "mock.width", label: "Mock width", kind: "number" },
+      { name: "mock.height", label: "Mock height", kind: "number" },
+      { name: "mock.image", label: "Mock image", kind: "json" },
+    ],
+    outputFields: [
+      { name: "path", label: "Path", kind: "text" },
+      { name: "mimeType", label: "MIME type", kind: "text" },
+      { name: "bytes", label: "Bytes", kind: "number" },
+      { name: "width", label: "Width", kind: "number" },
+      { name: "height", label: "Height", kind: "number" },
+      { name: "image", label: "Image", kind: "image" },
+    ],
+    createInput: () => ({ path: "input.png" }),
+  },
+  {
     type: "llm.prompt",
     namespace: "llm",
     label: "Prompt",
@@ -63,6 +88,37 @@ export const editorActions: EditorActionDefinition[] = [
       { name: "text", label: "Text", kind: "textarea" },
     ],
     createInput: () => ({ prompt: "" }),
+    createConfig: () => ({}),
+  },
+  {
+    type: "llm.vision_analyze",
+    namespace: "llm",
+    label: "Vision Analyze",
+    description: "Analyze an image and describe what it contains.",
+    inputFields: [
+      { name: "image", label: "Image", kind: "image", required: true, connectable: true },
+      { name: "prompt", label: "Prompt", kind: "textarea", connectable: true, placeholder: "Describe what matters in this image" },
+    ],
+    configFields: [
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.response", label: "Mock response", kind: "textarea", placeholder: "Optional deterministic response" },
+    ],
+    outputFields: [{ name: "text", label: "Text", kind: "textarea" }],
+    createInput: () => ({ image: { path: "input.png", mimeType: "image/png", bytes: 0 }, prompt: "" }),
+    createConfig: () => ({}),
+  },
+  {
+    type: "llm.ocr",
+    namespace: "llm",
+    label: "OCR",
+    description: "Extract text from an image.",
+    inputFields: [{ name: "image", label: "Image", kind: "image", required: true, connectable: true }],
+    configFields: [
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.response", label: "Mock response", kind: "textarea", placeholder: "Optional deterministic response" },
+    ],
+    outputFields: [{ name: "text", label: "Text", kind: "textarea" }],
+    createInput: () => ({ image: { path: "input.png", mimeType: "image/png", bytes: 0 } }),
     createConfig: () => ({}),
   },
   {

@@ -48,6 +48,9 @@ test("editor model exposes compatibility rules for UI wiring", () => {
   assert.equal(isCompatibleConnection("textarea", "textarea"), true);
   assert.equal(isCompatibleConnection("number", "textarea"), false);
   assert.equal(isCompatibleConnection("number", "json"), true);
+  assert.equal(isCompatibleConnection("image", "image"), true);
+  assert.equal(isCompatibleConnection("image", "json"), false);
+  assert.equal(isCompatibleConnection("text", "image"), false);
   assert.equal(isCompatibleConnection("array", "array"), true);
   assert.equal(isCompatibleConnection("boolean", "number"), false);
 });
@@ -93,6 +96,23 @@ test("editor model updates nested mock config fields", () => {
   state = updateStepConfig(state, prompt.id, "mock.enabled", true);
   state = updateStepConfig(state, prompt.id, "mock.response", "mocked response");
   assert.deepEqual(promptConfig(state), { mock: { enabled: true, response: "mocked response" } });
+});
+
+test("editor model wires image outputs only into image inputs", () => {
+  let state = createInitialEditorState();
+  state = addStep(state, "io.read_image");
+  state = addStep(state, "llm.ocr");
+
+  const readImage = state.workflow.steps.find((step) => step.type === "io.read_image")!;
+  const ocr = state.workflow.steps.find((step) => step.type === "llm.ocr")!;
+  const imageField = { name: "image", label: "Image", kind: "image" as const, connectable: true };
+  const connections = availableConnections(state, ocr.id, imageField);
+
+  assert.ok(connections.some((connection) => connection.fromStepId === readImage.id && connection.field.name === "image"));
+  assert.equal(connections.some((connection) => connection.field.name === "content"), false);
+
+  const result = connectCompatibleField(state, ocr.id, "image", readImage.id, "image");
+  assert.equal(result.ok, true);
 });
 
 function summarizeInput(state: ReturnType<typeof createInitialEditorState>): unknown {

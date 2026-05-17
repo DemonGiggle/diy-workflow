@@ -51,10 +51,61 @@ export const zhTw: LocaleResources = {
         bytes: { label: "位元組數" },
       },
     },
+    "io.read_image": {
+      label: "讀取圖片",
+      description: "讀取本機圖片並輸出結構化的 image artifact。",
+      inputFields: { path: { label: "路徑", placeholder: "input.png" } },
+      configFields: {
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.path": { label: "Mock 路徑", placeholder: "mock/input.png" },
+        "mock.mimeType": { label: "Mock MIME 類型", placeholder: "image/png" },
+        "mock.bytes": { label: "Mock 位元組數" },
+        "mock.width": { label: "Mock 寬度" },
+        "mock.height": { label: "Mock 高度" },
+        "mock.image": { label: "Mock 圖片" },
+      },
+      outputFields: {
+        path: { label: "路徑" },
+        mimeType: { label: "MIME 類型" },
+        bytes: { label: "位元組數" },
+        width: { label: "寬度" },
+        height: { label: "高度" },
+        image: { label: "圖片" },
+      },
+    },
     "llm.prompt": {
       label: "提示詞",
       description: "向 AI model 發送 prompt。MVP 使用可重現的 mock 輸出。",
       inputFields: { prompt: { label: "提示詞", placeholder: "請針對 {{input}} 寫出精簡回答" } },
+      configFields: {
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.response": { label: "Mock 回應", placeholder: "選填的固定回應" },
+      },
+      outputFields: {
+        text: { label: "文字" },
+      },
+    },
+    "llm.vision_analyze": {
+      label: "圖片理解",
+      description: "分析圖片並描述其內容。",
+      inputFields: {
+        image: { label: "圖片" },
+        prompt: { label: "提示詞", placeholder: "描述這張圖片中重要的內容" },
+      },
+      configFields: {
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.response": { label: "Mock 回應", placeholder: "選填的固定回應" },
+      },
+      outputFields: {
+        text: { label: "文字" },
+      },
+    },
+    "llm.ocr": {
+      label: "OCR",
+      description: "從圖片擷取文字。",
+      inputFields: {
+        image: { label: "圖片" },
+      },
       configFields: {
         "mock.enabled": { label: "Mock 模式" },
         "mock.response": { label: "Mock 回應", placeholder: "選填的固定回應" },

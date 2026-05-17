@@ -117,6 +117,57 @@ test("CLI serve launches a real HTTP server for static UI and workflow API", asy
   }
 });
 
+test("CLI runs image workflows with connected image artifacts", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-image-cli-"));
+  try {
+    await writeFile(join(dir, "input.png"), pngFixture());
+    const workflowPath = join(dir, "workflow.yaml");
+    await writeFile(workflowPath, [
+      "name: image-cli-test",
+      "steps:",
+      "  - id: read",
+      "    type: io.read_image",
+      "    input:",
+      "      path: input.png",
+      "  - id: ocr",
+      "    type: llm.ocr",
+      "    input:",
+      "      image: \"{{steps.read.output.image}}\"",
+      "    config:",
+      "      mock:",
+      "        enabled: true",
+      "        response: \"Detected image text\"",
+      "  - id: summarize",
+      "    type: llm.summarize",
+      "    input:",
+      "      text: \"{{steps.ocr.output.text}}\"",
+      "    config:",
+      "      mock:",
+      "        enabled: true",
+      "        summary: \"Summary from OCR\"",
+      "        sentenceCount: 1",
+      "",
+    ].join("\n"), "utf8");
+
+    const run = await runCli(["run", workflowPath], dir);
+    assert.equal(run.code, 0);
+    assert.match(run.stdout, /SUCCESS run_0001/);
+
+    const show = await runCli(["runs", "show", "run_0001"], dir);
+    const trace = JSON.parse(show.stdout) as {
+      status: string;
+      steps: Array<{ id: string; type: string; output: { image?: { mimeType?: string }; text?: string; summary?: string } }>;
+    };
+    assert.equal(trace.status, "success");
+    assert.equal(trace.steps[0]?.type, "io.read_image");
+    assert.equal(trace.steps[0]?.output.image?.mimeType, "image/png");
+    assert.equal(trace.steps[1]?.output.text, "Detected image text");
+    assert.equal(trace.steps[2]?.output.summary, "Summary from OCR");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 function runCli(args: string[], cwd: string): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, [cliPath, ...args], { cwd, env: process.env });
@@ -170,4 +221,11 @@ function freePort(): Promise<number> {
     });
     server.on("error", reject);
   });
+}
+
+function pngFixture(): Buffer {
+  return Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2sZl8AAAAASUVORK5CYII=",
+    "base64",
+  );
 }

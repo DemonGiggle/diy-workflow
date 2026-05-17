@@ -7,7 +7,9 @@ import { createDefaultRegistry } from "./actions/index.js";
 import { faninAction, fanoutAction } from "./actions/control.js";
 import { exactMatchAction } from "./actions/eval.js";
 import { readFileAction } from "./actions/io.js";
+import { readImageAction } from "./actions/image.js";
 import { promptAction, summarizeAction } from "./actions/llm.js";
+import { ocrAction, visionAnalyzeAction } from "./actions/image.js";
 import type { ActionContext } from "./types.js";
 import { Document, Packer, Paragraph } from "docx";
 import PDFDocument from "pdfkit";
@@ -45,6 +47,47 @@ test("read_file reads workspace-relative files and supports mock output", async 
       { mock: { enabled: true, path: "mock://file.txt", content: "Mocked", bytes: 6 } },
     );
     assert.deepEqual(mocked, { path: "mock://file.txt", content: "Mocked", bytes: 6 });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("read_image reads image metadata and supports mock output", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-images-"));
+  try {
+    await writeFile(join(dir, "input.png"), pngFixture());
+
+    const output = await readImageAction.run({ path: "input.png" }, context(dir));
+    assert.equal(output.mimeType, "image/png");
+    assert.equal(output.bytes, pngFixture().byteLength);
+    assert.equal(output.width, 1);
+    assert.equal(output.height, 1);
+    assert.equal(output.image.mimeType, "image/png");
+    assert.equal(output.image.width, 1);
+
+    const mocked = await readImageAction.run(
+      { path: "missing.png" },
+      context(dir),
+      {
+        mock: {
+          enabled: true,
+          path: "mock/input.png",
+          mimeType: "image/png",
+          bytes: 42,
+          width: 800,
+          height: 600,
+          image: { path: "mock/input.png", mimeType: "image/png", bytes: 42, width: 800, height: 600 },
+        },
+      },
+    );
+    assert.deepEqual(mocked, {
+      path: "mock/input.png",
+      mimeType: "image/png",
+      bytes: 42,
+      width: 800,
+      height: 600,
+      image: { path: "mock/input.png", mimeType: "image/png", bytes: 42, width: 800, height: 600 },
+    });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -102,6 +145,31 @@ test("llm prompt renders variables and accepts mock response", async () => {
     { mock: { enabled: true, response: "Mock response" } },
   );
   assert.deepEqual(mocked, { text: "Mock response" });
+});
+
+test("llm vision analyze and ocr produce deterministic previews and mock responses", async () => {
+  const image = { path: "/tmp/input.png", mimeType: "image/png", bytes: 12, width: 1, height: 1 };
+
+  const analyzed = await visionAnalyzeAction.run({ image, prompt: "Describe the image" }, context());
+  assert.match(analyzed.text, /input\.png/);
+  assert.match(analyzed.text, /Describe the image/);
+
+  const ocr = await ocrAction.run({ image }, context());
+  assert.match(ocr.text, /OCR preview/);
+
+  const mockedAnalyze = await visionAnalyzeAction.run(
+    { image },
+    context(),
+    { mock: { enabled: true, response: "Mock vision output" } },
+  );
+  assert.deepEqual(mockedAnalyze, { text: "Mock vision output" });
+
+  const mockedOcr = await ocrAction.run(
+    { image },
+    context(),
+    { mock: { enabled: true, response: "Mock OCR output" } },
+  );
+  assert.deepEqual(mockedOcr, { text: "Mock OCR output" });
 });
 
 test("llm summarize applies sentence and character limits and mock summary", async () => {
@@ -187,4 +255,11 @@ async function createPdfBuffer(lines: string[]): Promise<Buffer> {
     }
     doc.end();
   });
+}
+
+function pngFixture(): Buffer {
+  return Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2sZl8AAAAASUVORK5CYII=",
+    "base64",
+  );
 }
