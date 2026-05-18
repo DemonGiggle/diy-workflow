@@ -1,0 +1,37 @@
+name: provider-routing
+providerCatalog:
+  defaultProviderId: mock
+  defaultModelId: mock-default
+  providers:
+    - id: mock
+      label: Mock Provider
+      kind: mock
+      models:
+        - id: mock-default
+          label: Mock Default
+          capabilities:
+            text: true
+            vision: true
+        - id: mock-reviewer
+          label: Mock Reviewer
+          capabilities:
+            text: true
+            vision: true
+steps:
+  - id: draft
+    type: llm.prompt
+    input:
+      prompt: "Write a short project summary."
+
+  - id: review
+    type: llm.prompt
+    input:
+      prompt: "{{steps.draft.output.text}}"
+    config:
+      providerId: mock
+      modelId: mock-reviewer
+
+  - id: summarize
+    type: llm.summarize
+    input:
+      text: "{{steps.review.output.text}}"

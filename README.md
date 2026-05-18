@@ -61,6 +61,7 @@ node dist/cli.js serve --host 127.0.0.1 --port 4173
 
 - [Getting started](docs/getting-started.md): install, build, run examples, and serve the editor.
 - [Workflow YAML](docs/workflows.md): workflow shape, step references, validation, and traces.
+- [Provider and model configuration](docs/provider-models.md): provider catalog source of truth, defaults, overrides, runtime resolution, and secret handling.
 - [Actions](docs/actions.md): built-in actions, schemas, registry, config, and mock mode.
 - [Visual editor](docs/visual-editor.md): editor capabilities, UI-friendly schema model, and localization.
 - [Architecture](docs/architecture.md): project layout and execution flow.
