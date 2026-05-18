@@ -104,6 +104,72 @@ test("validator rejects unknown or disabled provider defaults", () => {
   assert.match(messages, /Default model is disabled/);
 });
 
+test("validator rejects incomplete or unknown node-level provider selections", () => {
+  const workflow: WorkflowDocument = {
+    providerCatalog: {
+      defaultProviderId: "mock",
+      defaultModelId: "mock-default",
+      providers: [
+        {
+          id: "mock",
+          label: "Mock Provider",
+          kind: "mock",
+          models: [{ id: "mock-default", label: "Mock Default", capabilities: { text: true, vision: true } }],
+        },
+        {
+          id: "openai",
+          label: "OpenAI",
+          kind: "openai-compatible",
+          models: [{ id: "gpt-4.1-mini", label: "GPT-4.1 Mini", capabilities: { text: true } }],
+        },
+      ],
+    },
+    steps: [
+      { id: "prompt", type: "llm.prompt", input: { prompt: "hello" }, config: { providerId: "openai" } },
+      { id: "vision", type: "llm.vision_analyze", input: { image: { path: "x.png", mimeType: "image/png", bytes: 1 } }, config: { providerId: "openai", modelId: "missing" } },
+    ],
+  };
+  const result = new WorkflowValidator(createDefaultRegistry()).validate(workflow);
+  assert.equal(result.ok, false);
+  const messages = result.issues.map((issue) => issue.message).join("\n");
+  assert.match(messages, /modelId is required/);
+  assert.match(messages, /Unknown model id for provider openai: missing/);
+});
+
+test("validator rejects node model selections that lack required vision capability", () => {
+  const workflow: WorkflowDocument = {
+    providerCatalog: {
+      defaultProviderId: "mock",
+      defaultModelId: "mock-default",
+      providers: [
+        {
+          id: "mock",
+          label: "Mock Provider",
+          kind: "mock",
+          models: [{ id: "mock-default", label: "Mock Default", capabilities: { text: true, vision: true } }],
+        },
+        {
+          id: "openai",
+          label: "OpenAI",
+          kind: "openai-compatible",
+          models: [{ id: "gpt-4.1-mini", label: "GPT-4.1 Mini", capabilities: { text: true } }],
+        },
+      ],
+    },
+    steps: [
+      {
+        id: "vision",
+        type: "llm.vision_analyze",
+        input: { image: { path: "x.png", mimeType: "image/png", bytes: 1 } },
+        config: { providerId: "openai", modelId: "gpt-4.1-mini" },
+      },
+    ],
+  };
+  const result = new WorkflowValidator(createDefaultRegistry()).validate(workflow);
+  assert.equal(result.ok, false);
+  assert.match(result.issues.map((issue) => issue.message).join("\n"), /does not support vision/);
+});
+
 test("executor runs workflow, resolves references, and saves trace", async () => {
   const dir = await mkdtemp(join(tmpdir(), "diy-workflow-"));
   try {

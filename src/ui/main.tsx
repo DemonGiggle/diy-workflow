@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Cable, CirclePlay, Copy, FileCode2, Grip, Plus, Settings2, Trash2 } from "lucide-react";
 import YAML from "yaml";
 import type { LlmProviderKind, RunTrace, WorkflowStep } from "../types.js";
+import { isLlmActionType, listSelectableModels } from "../providers.js";
 import { editorActions, getEditorAction, type EditorActionDefinition, type FieldDescriptor } from "./actionCatalog.js";
 import {
   addProvider,
@@ -12,6 +13,7 @@ import {
   connectCompatibleField,
   connectField,
   createInitialEditorState,
+  getLlmProviderSelection,
   getProviderCatalog,
   getWorkflowConnections,
   isCompatibleConnection,
@@ -21,6 +23,8 @@ import {
   removeStep,
   setDefaultModel,
   setDefaultProvider,
+  setStepLlmModel,
+  setStepLlmProvider,
   updateProviderField,
   updateProviderModelCapability,
   updateProviderModelField,
@@ -330,6 +334,9 @@ function Inspector({ state, step, locale, t, setState }: { state: EditorState; s
           onConnect={(sourceStep, sourceField) => setState((current) => connectField(current, step.id, field.name, sourceStep, sourceField))}
         />
       ))}
+      {isLlmActionType(step.type) && (
+        <LlmSelectionEditor state={state} step={step} t={t} setState={setState} />
+      )}
       {localizedAction.configFields.length > 0 && <h3>{t("common.config")}</h3>}
       {localizedAction.configFields.map((field) => (
         <FieldEditor
@@ -345,6 +352,72 @@ function Inspector({ state, step, locale, t, setState }: { state: EditorState; s
       <div className="output-list">{localizedAction.outputFields.map((field) => <code key={field.name}>{field.label}<span>{field.name} · {field.kind}</span></code>)}</div>
       <button className="danger" onClick={() => setState((current) => removeStep(current, step.id))}><Trash2 size={15}/> {t("step.delete")}</button>
     </section>
+  );
+}
+
+function LlmSelectionEditor({ state, step, t, setState }: {
+  state: EditorState;
+  step: WorkflowStep;
+  t: Translator;
+  setState: React.Dispatch<React.SetStateAction<EditorState>>;
+}) {
+  if (!isLlmActionType(step.type)) return null;
+
+  const catalog = getProviderCatalog(state);
+  const selection = getLlmProviderSelection(state, step);
+  if (!selection) return null;
+
+  const explicitProviderId = selection.explicitProviderId ?? "";
+  const activeProvider = explicitProviderId
+    ? catalog.providers.find((provider) => provider.id === explicitProviderId)
+    : catalog.providers.find((provider) => provider.id === selection.resolvedProviderId);
+  const activeModels = activeProvider ? listSelectableModels(activeProvider, selection.requiredCapability) : [];
+  const providerOptions = catalog.providers.filter((provider) => provider.enabled !== false);
+  const providerValue = explicitProviderId;
+  const defaultLabel = t("llm.selectionDefault", {
+    providerId: selection.resolvedProviderId ?? "?",
+    modelId: selection.resolvedModelId ?? "?",
+  });
+  const selectedModelValue = selection.explicitModelId ?? "";
+  const hasInvalidProvider = Boolean(explicitProviderId) && providerOptions.every((provider) => provider.id !== explicitProviderId);
+  const hasInvalidModel = Boolean(selectedModelValue) && activeModels.every((model) => model.id !== selectedModelValue);
+
+  return (
+    <>
+      <h3>{t("llm.selection")}</h3>
+      <div className="llm-selection-grid">
+        <label>
+          <span>{t("llm.provider")}</span>
+          <select value={providerValue} onChange={(event) => setState((current) => setStepLlmProvider(current, step.id, event.target.value))}>
+            <option value="">{defaultLabel}</option>
+            {providerOptions.map((provider) => <option key={provider.id} value={provider.id}>{provider.label} ({provider.id})</option>)}
+            {hasInvalidProvider && <option value={explicitProviderId}>{t("llm.selectionInvalid", { value: explicitProviderId })}</option>}
+          </select>
+        </label>
+        <label>
+          <span>{t("llm.model")}</span>
+          <select
+            value={selectedModelValue}
+            disabled={!explicitProviderId}
+            onChange={(event) => setState((current) => setStepLlmModel(current, step.id, event.target.value))}
+          >
+            {!explicitProviderId ? (
+              <option value="">{defaultLabel}</option>
+            ) : (
+              <>
+                {activeModels.map((model) => <option key={model.id} value={model.id}>{model.label} ({model.id})</option>)}
+                {activeModels.length === 0 && !hasInvalidModel && <option value="">{t("llm.noModels", { capability: selection.requiredCapability })}</option>}
+                {hasInvalidModel && <option value={selectedModelValue}>{t("llm.selectionInvalid", { value: selectedModelValue })}</option>}
+              </>
+            )}
+          </select>
+        </label>
+      </div>
+      {explicitProviderId && activeProvider && activeModels.length === 0 && (
+        <p className="field-error">{t("llm.noModels", { capability: selection.requiredCapability })}</p>
+      )}
+      {selection.issues.map((issue) => <p key={issue.field + issue.message} className="field-error">{issue.message}</p>)}
+    </>
   );
 }
 

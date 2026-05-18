@@ -37,6 +37,10 @@ interface OcrOutput {
 }
 
 const JPEG_SOF_MARKERS = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
+const llmSelectionConfigSchema = {
+  providerId: { type: "string", minLength: 1, nullable: true },
+  modelId: { type: "string", minLength: 1, nullable: true },
+};
 
 export const imageArtifactSchema = {
   type: "object",
@@ -66,6 +70,7 @@ export const readImageAction: ActionDefinition<ReadImageInput, ReadImageOutput> 
     type: "object",
     additionalProperties: false,
     properties: {
+      ...llmSelectionConfigSchema,
       mock: {
         type: "object",
         nullable: true,
@@ -142,6 +147,7 @@ export const visionAnalyzeAction: ActionDefinition<VisionAnalyzeInput, VisionAna
     type: "object",
     additionalProperties: false,
     properties: {
+      ...llmSelectionConfigSchema,
       mock: {
         type: "object",
         nullable: true,

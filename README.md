@@ -40,6 +40,7 @@ http://127.0.0.1:4173/
 
 - Workflows are YAML documents with ordered steps.
 - Workflows can optionally declare a workspace-level `providerCatalog` for LLM providers and models.
+- Each LLM step can optionally override the workflow default with its own `config.providerId` and `config.modelId`.
 - Every step has an `id`, action `type`, `input`, and optional `config`.
 - Every action defines typed input and output schemas.
 - Outputs are connected into later inputs with references like `{{steps.read.output.content}}`.
@@ -67,7 +68,10 @@ node dist/cli.js serve --host 127.0.0.1 --port 4173
 ## Built-In Actions
 
 - `io.read_file`
+- `io.read_image`
 - `llm.prompt`
+- `llm.vision_analyze`
+- `llm.ocr`
 - `llm.summarize`
 - `control.fanout`
 - `control.fanin`
@@ -78,3 +82,4 @@ node dist/cli.js serve --host 127.0.0.1 --port 4173
 This is an MVP for experimenting with typed workflow composition. The current implementation focuses on a clean engine, deterministic tests, CLI execution, and a UI-ready action model.
 
 LLM provider catalog support currently lives in the workflow document itself. Legacy workflows that omit `providerCatalog` fall back to a built-in deterministic `mock` provider and model.
+When an LLM step omits `config.providerId` and `config.modelId`, it inherits the workflow defaults. When it sets either value, both must be valid and refer to an enabled provider/model pair.

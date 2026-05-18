@@ -8,6 +8,7 @@ import {
   connectCompatibleField,
   connectField,
   createInitialEditorState,
+  getLlmProviderSelection,
   getProviderCatalog,
   getWorkflowConnections,
   isCompatibleConnection,
@@ -17,6 +18,8 @@ import {
   removeStep,
   setDefaultModel,
   setDefaultProvider,
+  setStepLlmModel,
+  setStepLlmProvider,
   updateProviderField,
   updateProviderModelCapability,
   updateProviderModelField,
@@ -186,6 +189,61 @@ test("editor model resets defaults when removing providers or models", () => {
   state = removeProvider(state, 1);
   catalog = getProviderCatalog(state);
   assert.equal(catalog.defaultProviderId, "mock");
+});
+
+test("editor model stores node-level provider and model overrides independently", () => {
+  let state = createInitialEditorState();
+  state = addProvider(state);
+  state = updateProviderField(state, 1, "id", "openai");
+  state = updateProviderField(state, 1, "label", "OpenAI");
+  state = updateProviderModelField(state, 1, 0, "id", "gpt-4.1-mini");
+  state = updateProviderModelField(state, 1, 0, "label", "GPT-4.1 Mini");
+  state = addProviderModel(state, 1);
+  state = updateProviderModelField(state, 1, 1, "id", "gpt-4.1");
+  state = updateProviderModelField(state, 1, 1, "label", "GPT-4.1");
+
+  const prompt = state.workflow.steps.find((step) => step.type === "llm.prompt")!;
+  const summarize = state.workflow.steps.find((step) => step.type === "llm.summarize")!;
+  state = setStepLlmProvider(state, prompt.id, "openai");
+  state = setStepLlmModel(state, prompt.id, "gpt-4.1");
+  state = setStepLlmProvider(state, summarize.id, "openai");
+  state = setStepLlmModel(state, summarize.id, "gpt-4.1-mini");
+
+  assert.deepEqual(state.workflow.steps.find((step) => step.id === prompt.id)?.config, {
+    providerId: "openai",
+    modelId: "gpt-4.1",
+  });
+  assert.deepEqual(state.workflow.steps.find((step) => step.id === summarize.id)?.config, {
+    maxSentences: 3,
+    providerId: "openai",
+    modelId: "gpt-4.1-mini",
+  });
+});
+
+test("editor model clears node-level provider overrides back to workflow defaults", () => {
+  let state = createInitialEditorState();
+  state = addProvider(state);
+  state = updateProviderField(state, 1, "id", "openai");
+  const prompt = state.workflow.steps.find((step) => step.type === "llm.prompt")!;
+  state = setStepLlmProvider(state, prompt.id, "openai");
+  state = setStepLlmProvider(state, prompt.id, "");
+
+  assert.equal(state.workflow.steps.find((step) => step.id === prompt.id)?.config, undefined);
+});
+
+test("editor model surfaces invalid node model references after catalog changes", () => {
+  let state = createInitialEditorState();
+  state = addProvider(state);
+  state = updateProviderField(state, 1, "id", "openai");
+  state = updateProviderModelField(state, 1, 0, "id", "gpt-4.1-mini");
+  const prompt = state.workflow.steps.find((step) => step.type === "llm.prompt")!;
+  state = setStepLlmProvider(state, prompt.id, "openai");
+  state = setStepLlmModel(state, prompt.id, "gpt-4.1-mini");
+  state = removeProviderModel(state, 1, 0);
+
+  const selection = getLlmProviderSelection(state, state.workflow.steps.find((step) => step.id === prompt.id)!);
+  assert.equal(selection?.issues[0]?.field, "modelId");
+  assert.match(selection?.issues[0]?.message ?? "", /Unknown model id/);
 });
 
 function summarizeInput(state: ReturnType<typeof createInitialEditorState>): unknown {

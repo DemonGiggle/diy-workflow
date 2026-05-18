@@ -1,4 +1,12 @@
-import { createDefaultProviderCatalog } from "../providers.js";
+import {
+  createDefaultProviderCatalog,
+  getRequiredCapabilityForAction,
+  inspectLlmProviderSelection,
+  isLlmActionType,
+  listSelectableModels,
+  readLlmNodeSelectionConfig,
+  type LlmProviderSelectionState,
+} from "../providers.js";
 import type { JsonObject, ProviderCatalog, StepTrace, WorkflowDocument, WorkflowStep } from "../types.js";
 import { createStep, getEditorAction, type FieldDescriptor, type FieldKind, type OutputDescriptor } from "./actionCatalog.js";
 
@@ -339,6 +347,40 @@ export function setDefaultModel(state: EditorState, modelId: string): EditorStat
   });
 }
 
+export function getLlmProviderSelection(state: EditorState, step: WorkflowStep): LlmProviderSelectionState | null {
+  if (!isLlmActionType(step.type)) return null;
+  return inspectLlmProviderSelection(getProviderCatalog(state), step.type, step.config);
+}
+
+export function setStepLlmProvider(state: EditorState, stepId: string, providerId: string): EditorState {
+  return updateStep(state, stepId, (step) => {
+    if (!isLlmActionType(step.type)) return step;
+    if (!providerId) return { ...step, config: pruneEmpty(clearLlmSelectionConfig(asObject(step.config))) };
+
+    const provider = getProviderCatalog(state).providers.find((item) => item.id === providerId);
+    if (!provider) {
+      return { ...step, config: pruneEmpty(writeLlmSelectionConfig(asObject(step.config), { providerId, modelId: undefined })) };
+    }
+
+    const current = readLlmNodeSelectionConfig(step.config);
+    const requiredCapability = getRequiredCapabilityForAction(step.type);
+    const selectable = listSelectableModels(provider, requiredCapability);
+    const fallbackModelId = selectable[0]?.id ?? provider.models[0]?.id;
+    const modelId = provider.models.some((model) => model.id === current.modelId) ? current.modelId : fallbackModelId;
+    return { ...step, config: pruneEmpty(writeLlmSelectionConfig(asObject(step.config), { providerId, modelId })) };
+  });
+}
+
+export function setStepLlmModel(state: EditorState, stepId: string, modelId: string): EditorState {
+  return updateStep(state, stepId, (step) => {
+    if (!isLlmActionType(step.type)) return step;
+    const selection = inspectLlmProviderSelection(getProviderCatalog(state), step.type, step.config);
+    const providerId = selection.explicitProviderId ?? selection.resolvedProviderId;
+    if (!providerId) return step;
+    return { ...step, config: pruneEmpty(writeLlmSelectionConfig(asObject(step.config), { providerId, modelId })) };
+  });
+}
+
 export function getProviderCatalog(state: EditorState): ProviderCatalog {
   return state.workflow.providerCatalog ?? createDefaultProviderCatalog();
 }
@@ -403,6 +445,22 @@ function extractFieldReferences(value: unknown): Array<{ stepId: string; field: 
   if (typeof value !== "string") return [];
   return [...value.matchAll(/{{\s*steps\.([A-Za-z0-9_-]+)\.output\.([A-Za-z0-9_.-]+)\s*}}/g)]
     .map((match) => ({ stepId: match[1]!, field: match[2]! }));
+}
+
+function writeLlmSelectionConfig(config: JsonObject, selection: { providerId?: string; modelId?: string }): JsonObject {
+  const next = { ...config };
+  if (selection.providerId) next.providerId = selection.providerId;
+  else delete next.providerId;
+  if (selection.modelId) next.modelId = selection.modelId;
+  else delete next.modelId;
+  return next;
+}
+
+function clearLlmSelectionConfig(config: JsonObject): JsonObject {
+  const next = { ...config };
+  delete next.providerId;
+  delete next.modelId;
+  return next;
 }
 
 function cloneProviderCatalog(catalog: ProviderCatalog): ProviderCatalog {

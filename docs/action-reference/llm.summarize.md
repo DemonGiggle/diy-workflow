@@ -23,6 +23,8 @@ Summarizes text with deterministic extractive summarization.
 
 | Field | Type | Description |
 | --- | --- | --- |
+| `providerId` | string | Optional node-level provider override. When set, `modelId` must also be set. |
+| `modelId` | string | Optional node-level model override for the selected provider. |
 | `maxSentences` | number | Maximum number of sentences to include. Defaults to `3`. Minimum `1`. |
 | `maxChars` | number | Optional maximum summary length. Minimum `1`. |
 

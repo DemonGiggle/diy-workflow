@@ -40,6 +40,27 @@ Each step has:
 - `input`: input object validated against the action input schema
 - `config`: optional config object validated against the action config schema
 
+LLM actions can also opt into node-level provider routing inside `config`:
+
+~~~yaml
+steps:
+  - id: prompt_fast
+    type: llm.prompt
+    input:
+      prompt: "Draft a short answer."
+    config:
+      providerId: openai
+      modelId: gpt-4.1-mini
+
+  - id: prompt_deep
+    type: llm.prompt
+    input:
+      prompt: "Draft a longer answer."
+    config:
+      providerId: anthropic
+      modelId: claude-sonnet-4
+~~~
+
 ## Provider Catalog
 
 `providerCatalog` is optional. Right now it lives at the workflow root so the workflow can carry its own provider/model catalog.
@@ -66,6 +87,13 @@ If you define `providerCatalog` explicitly, validation requires:
 - unique provider ids
 - unique model ids within each provider
 - enabled defaults
+
+LLM node overrides follow these rules:
+
+- omit both `config.providerId` and `config.modelId` to inherit workflow defaults
+- if one is set, both must be set
+- the referenced provider and model must exist and be enabled
+- vision actions require a model with `capabilities.vision: true`
 
 ## References
 
@@ -96,6 +124,7 @@ Validation checks:
 - reference step availability
 - action input schemas
 - action config schemas
+- LLM node provider/model overrides, when present
 
 When an input contains references, static input-schema validation is deferred until execution because the referenced value is not known yet. During execution, references are resolved, missing output paths fail the step, and the resolved input is validated against the action input schema.
 
