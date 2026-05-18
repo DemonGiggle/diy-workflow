@@ -34,6 +34,8 @@ Open:
 http://127.0.0.1:4173/
 ~~~
 
+The editor can load an existing `.yaml` / `.yml` workflow from local disk, save back to the opened file when the browser supports the File System Access API, and otherwise download the current YAML.
+
 ![Visual workflow editor with LLM action](docs/editor-llm-example.png)
 
 ## Core Concepts

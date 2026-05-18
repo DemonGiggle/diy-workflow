@@ -40,4 +40,5 @@ test("i18n localizes display text without changing workflow contract fields", ()
 test("i18n translator formats dynamic status messages", () => {
   assert.equal(createTranslator("en")("run.savedRuns", { count: 2 }), "2 saved run(s)");
   assert.equal(createTranslator("zh-TW")("run.loading", { runId: "run_0001" }), "載入 run_0001...");
+  assert.equal(createTranslator("en")("yaml.saved", { fileName: "workflow.yaml" }), "Saved workflow.yaml");
 });
