@@ -42,3 +42,12 @@ node dist/cli.js run examples/mock-e2e.yaml
 ~~~
 
 The visual editor exposes each action's mock settings in the config panel, including a checkbox for `mock.enabled`.
+
+## LLM Provider Routing
+
+All LLM actions can inherit the workflow default provider/model or override it per node with:
+
+- `config.providerId`
+- `config.modelId`
+
+See [Provider and model configuration](provider-models.md) for runtime resolution order, capability rules, secret handling, and migration notes.

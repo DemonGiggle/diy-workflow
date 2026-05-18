@@ -108,3 +108,10 @@ Validate and run the deterministic mock example:
 node dist/cli.js validate examples/mock-e2e.yaml
 node dist/cli.js run examples/mock-e2e.yaml
 ~~~
+
+Validate and run the provider-routing example:
+
+~~~sh
+node dist/cli.js validate examples/provider-routing.yaml
+node dist/cli.js run examples/provider-routing.yaml
+~~~

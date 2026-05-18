@@ -65,6 +65,8 @@ steps:
 
 `providerCatalog` is optional. Right now it lives at the workflow root so the workflow can carry its own provider/model catalog.
 
+For the complete product model, see [Provider and model configuration](provider-models.md).
+
 If you omit it entirely, diy-workflow falls back to a built-in deterministic mock catalog:
 
 ~~~yaml
