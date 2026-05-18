@@ -4,6 +4,19 @@ Workflows are YAML documents with ordered steps.
 
 ~~~yaml
 name: demo
+providerCatalog:
+  defaultProviderId: mock
+  defaultModelId: mock-default
+  providers:
+    - id: mock
+      label: Mock Provider
+      kind: mock
+      models:
+        - id: mock-default
+          label: Mock Default
+          capabilities:
+            text: true
+            vision: true
 steps:
   - id: read
     type: io.read_file
@@ -26,6 +39,33 @@ Each step has:
 - `type`: action type registered in the action registry
 - `input`: input object validated against the action input schema
 - `config`: optional config object validated against the action config schema
+
+## Provider Catalog
+
+`providerCatalog` is optional. Right now it lives at the workflow root so the workflow can carry its own provider/model catalog.
+
+If you omit it entirely, diy-workflow falls back to a built-in deterministic mock catalog:
+
+~~~yaml
+providerCatalog:
+  defaultProviderId: mock
+  defaultModelId: mock-default
+  providers:
+    - id: mock
+      label: Mock Provider
+      kind: mock
+      models:
+        - id: mock-default
+          label: Mock Default
+~~~
+
+If you define `providerCatalog` explicitly, validation requires:
+
+- `defaultProviderId`
+- `defaultModelId`
+- unique provider ids
+- unique model ids within each provider
+- enabled defaults
 
 ## References
 
@@ -50,6 +90,7 @@ References must point to earlier steps. Forward references are rejected during v
 Validation checks:
 
 - workflow shape
+- provider catalog shape and defaults, when present
 - unique step ids
 - valid action types
 - reference step availability

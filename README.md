@@ -39,6 +39,7 @@ http://127.0.0.1:4173/
 ## Core Concepts
 
 - Workflows are YAML documents with ordered steps.
+- Workflows can optionally declare a workspace-level `providerCatalog` for LLM providers and models.
 - Every step has an `id`, action `type`, `input`, and optional `config`.
 - Every action defines typed input and output schemas.
 - Outputs are connected into later inputs with references like `{{steps.read.output.content}}`.
@@ -75,3 +76,5 @@ node dist/cli.js serve --host 127.0.0.1 --port 4173
 ## Project Status
 
 This is an MVP for experimenting with typed workflow composition. The current implementation focuses on a clean engine, deterministic tests, CLI execution, and a UI-ready action model.
+
+LLM provider catalog support currently lives in the workflow document itself. Legacy workflows that omit `providerCatalog` fall back to a built-in deterministic `mock` provider and model.
