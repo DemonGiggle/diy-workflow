@@ -34,6 +34,76 @@ test("validator rejects references to future steps", () => {
   assert.match(result.issues[0]?.message ?? "", /not available/);
 });
 
+test("validator accepts legacy workflows without an explicit provider catalog", () => {
+  const workflow: WorkflowDocument = {
+    steps: [
+      { id: "prompt", type: "llm.prompt", input: { prompt: "hello" } },
+    ],
+  };
+  const result = new WorkflowValidator(createDefaultRegistry()).validate(workflow);
+  assert.equal(result.ok, true);
+});
+
+test("validator rejects provider catalogs with duplicate ids and missing defaults", () => {
+  const workflow: WorkflowDocument = {
+    providerCatalog: {
+      providers: [
+        {
+          id: "openai",
+          label: "OpenAI",
+          kind: "openai-compatible",
+          models: [
+            { id: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+            { id: "gpt-4.1-mini", label: "Duplicate" },
+          ],
+        },
+        {
+          id: "openai",
+          label: "Duplicate provider",
+          kind: "openai-compatible",
+          models: [{ id: "gpt-4.1", label: "GPT-4.1" }],
+        },
+      ],
+    },
+    steps: [
+      { id: "prompt", type: "llm.prompt", input: { prompt: "hello" } },
+    ],
+  };
+  const result = new WorkflowValidator(createDefaultRegistry()).validate(workflow);
+  assert.equal(result.ok, false);
+  const messages = result.issues.map((issue) => issue.message).join("\n");
+  assert.match(messages, /Duplicate provider id/);
+  assert.match(messages, /Duplicate model id/);
+  assert.match(messages, /defaultProviderId is required/);
+  assert.match(messages, /defaultModelId is required/);
+});
+
+test("validator rejects unknown or disabled provider defaults", () => {
+  const workflow: WorkflowDocument = {
+    providerCatalog: {
+      defaultProviderId: "openai",
+      defaultModelId: "gpt-4.1-mini",
+      providers: [
+        {
+          id: "openai",
+          label: "OpenAI",
+          kind: "openai-compatible",
+          enabled: false,
+          models: [{ id: "gpt-4.1-mini", label: "GPT-4.1 Mini", enabled: false }],
+        },
+      ],
+    },
+    steps: [
+      { id: "prompt", type: "llm.prompt", input: { prompt: "hello" } },
+    ],
+  };
+  const result = new WorkflowValidator(createDefaultRegistry()).validate(workflow);
+  assert.equal(result.ok, false);
+  const messages = result.issues.map((issue) => issue.message).join("\n");
+  assert.match(messages, /Default provider is disabled/);
+  assert.match(messages, /Default model is disabled/);
+});
+
 test("executor runs workflow, resolves references, and saves trace", async () => {
   const dir = await mkdtemp(join(tmpdir(), "diy-workflow-"));
   try {

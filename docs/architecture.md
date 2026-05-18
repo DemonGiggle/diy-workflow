@@ -12,8 +12,9 @@ load -> validate -> resolve inputs -> execute -> save trace
 
 - `ActionDefinition`: reusable typed building block with `type`, schemas, optional config schema, and `run(input, context)`
 - `ActionRegistry`: action lookup and schema metadata
-- `WorkflowValidator`: validates workflow shape, unique ids, action types, references, input schemas, and config schemas
+- `WorkflowValidator`: validates workflow shape, provider catalog defaults, unique ids, action types, references, input schemas, and config schemas
 - `WorkflowExecutor`: validates, resolves references, executes ordered steps, and saves traces
+- `src/providers.ts`: default mock provider catalog and deterministic provider/model resolution helpers
 - `TraceStore`: stores and reads run directories under `runs/`
 - `createWorkflowServer`: serves the built editor and local workflow API
 - `src/ui`: visual editor state model, action catalog, typed connection rules, locale resources, and React UI
@@ -56,3 +57,16 @@ web-dist/         generated UI build output
 The runtime action schema is the source of workflow correctness. The visual editor adds UI metadata in `src/ui/actionCatalog.ts` so the editor can render fields, connection ports, placeholders, and config controls without changing the runtime contract.
 
 This separation keeps the engine usable from the CLI while letting the editor become richer over time.
+
+## Provider Catalog
+
+Provider and model metadata currently lives directly on the workflow document as an optional `providerCatalog` block. That keeps the source of truth local to the workflow while the product is still CLI-first.
+
+When `providerCatalog` is omitted, the runtime and validation helpers fall back to a built-in enabled `mock` provider with one enabled `mock-default` model. When `providerCatalog` is present, it must declare:
+
+- `defaultProviderId`
+- `defaultModelId`
+- unique provider ids
+- unique model ids within each provider
+
+Disabled defaults are rejected during validation.

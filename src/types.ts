@@ -2,8 +2,42 @@ import type { JSONSchemaType } from "ajv";
 
 export type JsonObject = Record<string, unknown>;
 
+export type LlmProviderKind = "openai-compatible" | "anthropic" | "gemini" | "mock" | "custom";
+
+export interface LlmModelCapabilities {
+  text?: boolean;
+  vision?: boolean;
+  structuredOutput?: boolean;
+  tools?: boolean;
+}
+
+export interface LlmModelDefinition {
+  id: string;
+  label: string;
+  capabilities?: LlmModelCapabilities;
+  contextWindow?: number;
+  enabled?: boolean;
+}
+
+export interface LlmProviderDefinition {
+  id: string;
+  label: string;
+  kind: LlmProviderKind;
+  baseUrl?: string;
+  apiKeyRef?: string;
+  models: LlmModelDefinition[];
+  enabled?: boolean;
+}
+
+export interface ProviderCatalog {
+  providers: LlmProviderDefinition[];
+  defaultProviderId?: string;
+  defaultModelId?: string;
+}
+
 export interface WorkflowDocument {
   name?: string;
+  providerCatalog?: ProviderCatalog;
   steps: WorkflowStep[];
 }
 
@@ -73,4 +107,3 @@ export interface ValidationResult {
   ok: boolean;
   issues: ValidationIssue[];
 }
-
