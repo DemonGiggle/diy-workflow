@@ -7,6 +7,7 @@ import {
   availableConnections,
   connectCompatibleField,
   connectField,
+  createEditorStateFromWorkflow,
   createInitialEditorState,
   getLlmProviderSelection,
   getProviderCatalog,
@@ -39,6 +40,24 @@ test("editor model adds, moves, and removes nodes", () => {
 
   state = removeStep(state, added!.id);
   assert.equal(state.workflow.steps.some((step) => step.id === added!.id), false);
+});
+
+test("editor model hydrates editor state from loaded workflows", () => {
+  const state = createEditorStateFromWorkflow({
+    name: "loaded-flow",
+    steps: [
+      { id: "read", type: "io.read_file", input: { path: "input.txt" } },
+      { id: "prompt", type: "llm.prompt", input: { prompt: "{{steps.read.output.content}}" } },
+      { id: "summary", type: "llm.summarize", input: { text: "{{steps.prompt.output.text}}" } },
+      { id: "judge", type: "eval.exact_match", input: { actual: true, expected: true } },
+    ],
+  });
+
+  assert.equal(state.selectedStepId, "read");
+  assert.deepEqual(state.positions.read, { x: 72, y: 92 });
+  assert.deepEqual(state.positions.prompt, { x: 420, y: 92 });
+  assert.deepEqual(state.positions.summary, { x: 768, y: 92 });
+  assert.deepEqual(state.positions.judge, { x: 72, y: 340 });
 });
 
 test("editor model builds schema-style upstream references", () => {

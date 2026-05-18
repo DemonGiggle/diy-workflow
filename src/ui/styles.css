@@ -5,10 +5,10 @@ button, input, textarea, select { font: inherit; }
 button { border: 0; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.65; }
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
-.topbar { height: 68px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: #ffffff; border-bottom: 1px solid #d9dee7; }
+.topbar { min-height: 68px; display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: #ffffff; border-bottom: 1px solid #d9dee7; gap: 12px; }
 .topbar h1 { margin: 0; font-size: 20px; line-height: 1.1; letter-spacing: 0; }
 .topbar span { color: #667085; font-size: 13px; }
-.topbar-actions { display: flex; gap: 10px; }
+.topbar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .topbar button, .danger { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; border-radius: 6px; background: #1f6feb; color: #fff; font-weight: 650; }
 .topbar button.secondary, .secondary { background: #eef2f7; color: #1d2430; }
 .view-switch { display: inline-flex; gap: 6px; }
@@ -88,7 +88,7 @@ textarea { min-height: 82px; resize: vertical; line-height: 1.4; }
 
 @media (max-width: 720px) {
   .app-shell { overflow-x: hidden; }
-  .topbar { width: 100vw; height: auto; min-height: 68px; align-items: flex-start; gap: 12px; padding: 12px 14px; flex-wrap: wrap; }
+  .topbar { width: 100vw; min-height: 68px; align-items: flex-start; gap: 12px; padding: 12px 14px; flex-wrap: wrap; }
   .topbar-actions { width: calc(100vw - 28px); max-width: calc(100vw - 28px); }
   .view-switch { width: 100%; }
   .view-switch button { flex: 1 1 0; justify-content: center; }

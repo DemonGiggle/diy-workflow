@@ -12,6 +12,9 @@ The visual editor is the UI foundation for composing workflows from typed action
 - enable action-level mock mode from the config panel
 - run workflows through the local server API
 - inspect saved traces
+- load existing workflow YAML from local files
+- save back to the opened YAML file when supported by the browser
+- download YAML when native file-save access is unavailable
 - copy generated YAML
 
 ## Typed Connections

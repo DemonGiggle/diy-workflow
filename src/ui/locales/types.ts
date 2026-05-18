@@ -59,6 +59,14 @@ export type UiStringKey =
   | "step.id"
   | "view.providers"
   | "view.workflow"
+  | "yaml.downloadAction"
+  | "yaml.downloaded"
+  | "yaml.loadAction"
+  | "yaml.loadFailed"
+  | "yaml.loaded"
+  | "yaml.saveAction"
+  | "yaml.saveFailed"
+  | "yaml.saved"
   | "yaml.title";
 
 export type ActionFieldTranslations = Record<string, { label: string; placeholder?: string }>;

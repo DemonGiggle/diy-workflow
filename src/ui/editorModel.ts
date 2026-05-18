@@ -41,6 +41,14 @@ export interface ConnectionResult {
   message?: string;
 }
 
+const nodeLayout = {
+  startX: 72,
+  startY: 92,
+  gapX: 348,
+  gapY: 248,
+  maxColumns: 3,
+} as const;
+
 export function createInitialEditorState(): EditorState {
   const read = createStep("io.read_file", 0);
   const prompt = createStep("llm.prompt", 1);
@@ -48,13 +56,20 @@ export function createInitialEditorState(): EditorState {
   prompt.input = { prompt: referenceFor(read.id, "content") };
   summarize.input = { text: referenceFor(prompt.id, "text") };
   return {
-    workflow: { name: "visual-workflow", providerCatalog: createDefaultProviderCatalog(), steps: [read, prompt, summarize] },
+    ...createEditorStateFromWorkflow({
+      name: "visual-workflow",
+      providerCatalog: createDefaultProviderCatalog(),
+      steps: [read, prompt, summarize],
+    }),
     selectedStepId: prompt.id,
-    positions: {
-      [read.id]: { x: 72, y: 92 },
-      [prompt.id]: { x: 420, y: 92 },
-      [summarize.id]: { x: 768, y: 92 },
-    },
+  };
+}
+
+export function createEditorStateFromWorkflow(workflow: WorkflowDocument): EditorState {
+  return {
+    workflow,
+    selectedStepId: workflow.steps[0]?.id ?? null,
+    positions: Object.fromEntries(workflow.steps.map((step, index) => [step.id, defaultNodePosition(index)])),
   };
 }
 
@@ -474,5 +489,14 @@ function cloneProviderCatalog(catalog: ProviderCatalog): ProviderCatalog {
         capabilities: model.capabilities ? { ...model.capabilities } : undefined,
       })),
     })),
+  };
+}
+
+function defaultNodePosition(index: number): NodePosition {
+  const column = index % nodeLayout.maxColumns;
+  const row = Math.floor(index / nodeLayout.maxColumns);
+  return {
+    x: nodeLayout.startX + column * nodeLayout.gapX,
+    y: nodeLayout.startY + row * nodeLayout.gapY,
   };
 }

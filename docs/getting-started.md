@@ -93,6 +93,12 @@ http://127.0.0.1:4173/
 
 If the server reports that `web-dist/index.html` is missing, run `npm run build:ui`.
 
+The editor can now:
+
+- load an existing `.yaml` / `.yml` workflow from local disk
+- save back to the opened file when the browser supports the File System Access API
+- fall back to downloading the current workflow YAML when native save is unavailable
+
 ## Useful Examples
 
 Validate and run the LLM-oriented example:

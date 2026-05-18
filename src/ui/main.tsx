@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Cable, CirclePlay, Copy, FileCode2, Grip, Plus, Settings2, Trash2 } from "lucide-react";
+import { Cable, CirclePlay, Copy, Download, FileCode2, FolderOpen, Grip, Plus, Save, Settings2, Trash2 } from "lucide-react";
 import YAML from "yaml";
 import type { LlmProviderKind, RunTrace, WorkflowStep } from "../types.js";
 import { isLlmActionType, listSelectableModels } from "../providers.js";
@@ -12,6 +12,7 @@ import {
   availableConnections,
   connectCompatibleField,
   connectField,
+  createEditorStateFromWorkflow,
   createInitialEditorState,
   getLlmProviderSelection,
   getProviderCatalog,
@@ -32,12 +33,21 @@ import {
   updateStepInput,
   type EditorState,
 } from "./editorModel.js";
-import { listRuns, runWorkflow, showRun } from "./apiClient.js";
+import { listRuns, runWorkflow, showRun, validateWorkflow } from "./apiClient.js";
 import type { OutputDescriptor } from "./actionCatalog.js";
 import { createTranslator, isLocale, localeOptions, localizeAction, localizeActions, type Locale } from "./i18n.js";
+import { formatValidationIssues, parseWorkflowYaml, suggestWorkflowFileName } from "./workflowFiles.js";
 import "./styles.css";
 
 const localeStorageKey = "diy-workflow.locale";
+const yamlPickerTypes = [{
+  description: "Workflow YAML",
+  accept: {
+    "application/yaml": [".yaml", ".yml"],
+    "text/yaml": [".yaml", ".yml"],
+    "text/plain": [".yaml", ".yml"],
+  },
+}];
 
 function App() {
   const [state, setState] = useState<EditorState>(() => createInitialEditorState());
@@ -48,8 +58,13 @@ function App() {
   const t = useMemo(() => createTranslator(locale), [locale]);
   const [statusMessage, setStatusMessage] = useState<string>(() => t("run.ready"));
   const [isRunning, setIsRunning] = useState(false);
+  const [workflowFileHandle, setWorkflowFileHandle] = useState<WorkflowFileHandle | null>(null);
+  const [workflowFileName, setWorkflowFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedStep = state.workflow.steps.find((step) => step.id === state.selectedStepId) ?? state.workflow.steps[0] ?? null;
   const yaml = useMemo(() => YAML.stringify(state.workflow), [state.workflow]);
+  const saveUsesFileSystemApi = workflowFileHandle !== null || supportsSavePicker();
+  const saveActionLabel = saveUsesFileSystemApi ? t("yaml.saveAction") : t("yaml.downloadAction");
 
   useEffect(() => {
     window.localStorage?.setItem(localeStorageKey, locale);
@@ -85,6 +100,88 @@ function App() {
     }
   }
 
+  async function applyLoadedWorkflow(file: File, handle: WorkflowFileHandle | null) {
+    const loadedYaml = await file.text();
+    const workflow = parseWorkflowYaml(loadedYaml);
+    const validation = await validateWorkflow(workflow);
+    if (!validation.ok) {
+      throw new Error(formatValidationIssues(validation.issues));
+    }
+
+    setState(createEditorStateFromWorkflow(workflow));
+    setTrace(null);
+    setWorkflowFileHandle(handle);
+    setWorkflowFileName(file.name);
+    setStatusMessage(t("yaml.loaded", { fileName: file.name }));
+  }
+
+  async function openWorkflowYaml() {
+    try {
+      if (supportsOpenPicker()) {
+        const [handle] = await getFileSystemWindow().showOpenFilePicker?.({
+          multiple: false,
+          excludeAcceptAllOption: true,
+          types: yamlPickerTypes,
+        }) ?? [];
+        if (handle) await applyLoadedWorkflow(await handle.getFile(), handle);
+        return;
+      }
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+        fileInputRef.current.click();
+      }
+    } catch (error) {
+      if (isAbortError(error)) return;
+      setStatusMessage(t("yaml.loadFailed", { message: error instanceof Error ? error.message : String(error) }));
+    }
+  }
+
+  async function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+
+    try {
+      await applyLoadedWorkflow(file, null);
+    } catch (error) {
+      setStatusMessage(t("yaml.loadFailed", { message: error instanceof Error ? error.message : String(error) }));
+    }
+  }
+
+  async function saveWorkflowYaml() {
+    const suggestedName = workflowFileName ?? suggestWorkflowFileName(state.workflow);
+
+    try {
+      if (workflowFileHandle) {
+        await writeWorkflowFile(workflowFileHandle, yaml);
+        setStatusMessage(t("yaml.saved", { fileName: workflowFileHandle.name }));
+        return;
+      }
+
+      if (supportsSavePicker()) {
+        const handle = await getFileSystemWindow().showSaveFilePicker?.({
+          suggestedName,
+          excludeAcceptAllOption: true,
+          types: yamlPickerTypes,
+        });
+        if (!handle) return;
+        await writeWorkflowFile(handle, yaml);
+        setWorkflowFileHandle(handle);
+        setWorkflowFileName(handle.name);
+        setStatusMessage(t("yaml.saved", { fileName: handle.name }));
+        return;
+      }
+
+      downloadWorkflowYaml(yaml, suggestedName);
+      setWorkflowFileName(suggestedName);
+      setStatusMessage(t("yaml.downloaded", { fileName: suggestedName }));
+    } catch (error) {
+      if (isAbortError(error)) return;
+      setStatusMessage(t("yaml.saveFailed", { message: error instanceof Error ? error.message : String(error) }));
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -103,10 +200,13 @@ function App() {
               {localeOptions.map((option) => <option key={option.locale} value={option.locale}>{option.label}</option>)}
             </select>
           </label>
+          <button className="secondary" onClick={openWorkflowYaml}><FolderOpen size={16}/> {t("yaml.loadAction")}</button>
+          <button className="secondary" onClick={saveWorkflowYaml}>{saveUsesFileSystemApi ? <Save size={16}/> : <Download size={16}/>} {saveActionLabel}</button>
           <button className="secondary" onClick={() => navigator.clipboard?.writeText(yaml)}><Copy size={16}/> {t("run.copyYaml")}</button>
           <button onClick={executeWorkflow} disabled={isRunning}><CirclePlay size={16}/> {isRunning ? t("run.running") : t("run.runWorkflow")}</button>
         </div>
       </header>
+      <input ref={fileInputRef} type="file" accept=".yaml,.yml" hidden onChange={handleFileInputChange} />
 
       <section className="workspace">
         {view === "workflow" ? (
@@ -124,7 +224,7 @@ function App() {
           {view === "workflow"
             ? selectedStep ? <Inspector state={state} step={selectedStep} locale={locale} t={t} setState={setState} /> : <EmptyInspector t={t} />
             : <ProviderDefaultsPanel state={state} t={t} setState={setState} />}
-          <YamlPanel yaml={yaml} t={t} />
+          <YamlPanel yaml={yaml} t={t} fileName={workflowFileName} />
           <TracePanel trace={trace} runs={runs} statusMessage={statusMessage} t={t} onRefresh={() => refreshRuns(setRuns, setStatusMessage, t)} onShowRun={inspectRun} />
         </aside>
       </section>
@@ -578,8 +678,14 @@ function ProviderDefaultsPanel({ state, t, setState }: { state: EditorState; t: 
   );
 }
 
-function YamlPanel({ yaml, t }: { yaml: string; t: Translator }) {
-  return <section className="yaml-panel"><h2>{t("yaml.title")}</h2><pre>{yaml}</pre></section>;
+function YamlPanel({ yaml, t, fileName }: { yaml: string; t: Translator; fileName: string | null }) {
+  return (
+    <section className="yaml-panel">
+      <h2>{t("yaml.title")}</h2>
+      {fileName ? <p className="muted">{fileName}</p> : null}
+      <pre>{yaml}</pre>
+    </section>
+  );
 }
 
 function TracePanel({ trace, runs, statusMessage, t, onRefresh, onShowRun }: {
@@ -635,6 +741,63 @@ function jsonValue(value: unknown): string {
 function parseJsonish(value: string): unknown {
   if (value.trim().startsWith("{{")) return value;
   try { return JSON.parse(value); } catch { return value; }
+}
+
+interface WorkflowFileWriter {
+  write(data: string): Promise<void>;
+  close(): Promise<void>;
+}
+
+interface WorkflowFileHandle {
+  name: string;
+  getFile(): Promise<File>;
+  createWritable(): Promise<WorkflowFileWriter>;
+}
+
+interface WindowWithFileSystemAccess extends Window {
+  showOpenFilePicker?: (options?: {
+    multiple?: boolean;
+    excludeAcceptAllOption?: boolean;
+    types?: Array<{ description?: string; accept: Record<string, string[]> }>;
+  }) => Promise<WorkflowFileHandle[]>;
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string;
+    excludeAcceptAllOption?: boolean;
+    types?: Array<{ description?: string; accept: Record<string, string[]> }>;
+  }) => Promise<WorkflowFileHandle>;
+}
+
+function getFileSystemWindow(): WindowWithFileSystemAccess {
+  return window as WindowWithFileSystemAccess;
+}
+
+function supportsOpenPicker(): boolean {
+  return typeof getFileSystemWindow().showOpenFilePicker === "function";
+}
+
+function supportsSavePicker(): boolean {
+  return typeof getFileSystemWindow().showSaveFilePicker === "function";
+}
+
+function isAbortError(error: unknown): boolean {
+  return (error instanceof DOMException && error.name === "AbortError")
+    || (error instanceof Error && error.name === "AbortError");
+}
+
+async function writeWorkflowFile(handle: WorkflowFileHandle, content: string): Promise<void> {
+  const writable = await handle.createWritable();
+  await writable.write(content);
+  await writable.close();
+}
+
+function downloadWorkflowYaml(content: string, fileName: string): void {
+  const blob = new Blob([content], { type: "application/yaml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
