@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -192,6 +192,129 @@ test("executor runs workflow, resolves references, and saves trace", async () =>
     assert.equal(trace.steps.length, 3);
     assert.deepEqual(trace.steps[2]?.output, { matched: true, actual: "One. Two.", expected: "One. Two." });
   } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("executor records resolved llm provider metadata in traces", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-"));
+  try {
+    const workflow: WorkflowDocument = {
+      providerCatalog: {
+        defaultProviderId: "mock",
+        defaultModelId: "mock-default",
+        providers: [
+          {
+            id: "mock",
+            label: "Mock Provider",
+            kind: "mock",
+            models: [
+              { id: "mock-default", label: "Mock Default", capabilities: { text: true, vision: true } },
+              { id: "mock-vision", label: "Mock Vision", capabilities: { text: true, vision: true } },
+            ],
+          },
+        ],
+      },
+      steps: [
+        { id: "prompt", type: "llm.prompt", input: { prompt: "hello" }, config: { providerId: "mock", modelId: "mock-default" } },
+        {
+          id: "vision",
+          type: "llm.vision_analyze",
+          input: { image: { path: "x.png", mimeType: "image/png", bytes: 1 }, prompt: "describe" },
+          config: { providerId: "mock", modelId: "mock-vision" },
+        },
+      ],
+    };
+
+    const trace = await new WorkflowExecutor().execute({
+      workflowPath: join(dir, "workflow.yaml"),
+      workflow,
+      registry: createDefaultRegistry(),
+      traceStore: new TraceStore(join(dir, "runs")),
+    });
+
+    assert.equal((trace.steps[0]?.metadata as { llm?: { providerId: string; modelId: string } })?.llm?.providerId, "mock");
+    assert.equal((trace.steps[0]?.metadata as { llm?: { providerId: string; modelId: string } })?.llm?.modelId, "mock-default");
+    assert.equal((trace.steps[1]?.metadata as { llm?: { operation: string; modelId: string } })?.llm?.operation, "llm.vision_analyze");
+    assert.equal((trace.steps[1]?.metadata as { llm?: { operation: string; modelId: string } })?.llm?.modelId, "mock-vision");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("executor fails clearly for non-mock providers without configured credentials", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-"));
+  try {
+    const workflow: WorkflowDocument = {
+      providerCatalog: {
+        defaultProviderId: "openai",
+        defaultModelId: "gpt-4.1-mini",
+        providers: [
+          {
+            id: "openai",
+            label: "OpenAI",
+            kind: "openai-compatible",
+            models: [{ id: "gpt-4.1-mini", label: "GPT-4.1 Mini", capabilities: { text: true } }],
+          },
+        ],
+      },
+      steps: [
+        { id: "prompt", type: "llm.prompt", input: { prompt: "hello" } },
+      ],
+    };
+
+    const trace = await new WorkflowExecutor().execute({
+      workflowPath: join(dir, "workflow.yaml"),
+      workflow,
+      registry: createDefaultRegistry(),
+      traceStore: new TraceStore(join(dir, "runs")),
+    });
+
+    assert.equal(trace.status, "failed");
+    assert.match(trace.steps[0]?.error ?? "", /requires apiKeyRef/);
+    assert.equal((trace.steps[0]?.metadata as { llm?: { providerId: string } })?.llm?.providerId, "openai");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("saved traces do not include provider apiKeyRef or secret values", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-"));
+  const originalSecret = process.env.TEST_DW_SECRET;
+  process.env.TEST_DW_SECRET = "super-secret-token";
+  try {
+    const workflow: WorkflowDocument = {
+      providerCatalog: {
+        defaultProviderId: "openai",
+        defaultModelId: "gpt-4.1-mini",
+        providers: [
+          {
+            id: "openai",
+            label: "OpenAI",
+            kind: "openai-compatible",
+            apiKeyRef: "env:TEST_DW_SECRET",
+            models: [{ id: "gpt-4.1-mini", label: "GPT-4.1 Mini", capabilities: { text: true } }],
+          },
+        ],
+      },
+      steps: [
+        { id: "prompt", type: "llm.prompt", input: { prompt: "hello" } },
+      ],
+    };
+
+    const trace = await new WorkflowExecutor().execute({
+      workflowPath: join(dir, "workflow.yaml"),
+      workflow,
+      registry: createDefaultRegistry(),
+      traceStore: new TraceStore(join(dir, "runs")),
+    });
+    const saved = await readFile(join(dir, "runs", trace.runId, "trace.json"), "utf8");
+    assert.doesNotMatch(saved, /apiKeyRef/);
+    assert.doesNotMatch(saved, /super-secret-token/);
+    assert.match(saved, /"providerId": "openai"/);
+  } finally {
+    if (originalSecret === undefined) delete process.env.TEST_DW_SECRET;
+    else process.env.TEST_DW_SECRET = originalSecret;
     await rm(dir, { recursive: true, force: true });
   }
 });

@@ -8,6 +8,12 @@ diy-workflow is organized around a small execution engine and UI-friendly schema
 load -> validate -> resolve inputs -> execute -> save trace
 ~~~
 
+For LLM actions, the execute phase now includes provider routing:
+
+~~~text
+resolve provider/model -> attach safe llm trace metadata -> dispatch adapter -> save trace
+~~~
+
 ## Core Components
 
 - `ActionDefinition`: reusable typed building block with `type`, schemas, optional config schema, and `run(input, context)`
@@ -15,6 +21,7 @@ load -> validate -> resolve inputs -> execute -> save trace
 - `WorkflowValidator`: validates workflow shape, provider catalog defaults, unique ids, action types, references, input schemas, and config schemas
 - `WorkflowExecutor`: validates, resolves references, executes ordered steps, and saves traces
 - `src/providers.ts`: default mock provider catalog and deterministic provider/model resolution helpers
+- `src/llmRuntime.ts`: LLM adapter boundary, provider/model resolution, deterministic mock execution, and placeholder non-mock adapters
 - `TraceStore`: stores and reads run directories under `runs/`
 - `createWorkflowServer`: serves the built editor and local workflow API
 - `src/ui`: visual editor state model, action catalog, typed connection rules, locale resources, and React UI
@@ -70,3 +77,23 @@ When `providerCatalog` is omitted, the runtime and validation helpers fall back 
 - unique model ids within each provider
 
 Disabled defaults are rejected during validation.
+
+## LLM Runtime Resolution
+
+LLM runtime execution follows this order:
+
+1. read the node-level `config.providerId` and `config.modelId`, if present
+2. otherwise fall back to `providerCatalog.defaultProviderId` and `providerCatalog.defaultModelId`
+3. confirm the provider/model exist, are enabled, and satisfy the action capability
+4. record safe trace metadata with provider/model ids and provider kind
+5. dispatch through the provider adapter boundary
+
+Today the built-in `mock` adapter is the only fully implemented runtime adapter. It preserves deterministic local execution for tests and examples.
+
+Other provider kinds currently act as scaffolding:
+
+- they require `apiKeyRef`
+- `apiKeyRef` should point to an environment variable, for example `env:OPENAI_API_KEY`
+- once credentials are present, the runtime still returns a clear "not implemented yet" error until a real adapter lands
+
+Trace files never include provider `apiKeyRef` or resolved secret values. They only store safe execution metadata such as provider/model ids.

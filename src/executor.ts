@@ -2,6 +2,7 @@ import { Ajv } from "ajv";
 import { dirname, resolve } from "node:path";
 import type { ActionContext, JsonObject, RunTrace, StepTrace, WorkflowDocument } from "./types.js";
 import type { ActionRegistry } from "./registry.js";
+import { createLlmRuntime } from "./llmRuntime.js";
 import { resolveReferences, type StepOutputRecord } from "./references.js";
 import { TraceStore } from "./trace.js";
 import { WorkflowValidator } from "./validator.js";
@@ -40,6 +41,7 @@ export class WorkflowExecutor {
       let resolvedInput: unknown = null;
       let output: unknown = null;
       let error: string | null = null;
+      let metadata = {};
       let stepStatus: "success" | "failed" = "success";
 
       try {
@@ -51,6 +53,15 @@ export class WorkflowExecutor {
           stepId: step.id,
           cwd,
           registry: options.registry,
+          llm: createLlmRuntime({
+            workflow: options.workflow,
+            setTraceMetadata: (patch) => {
+              metadata = { ...metadata, ...patch };
+            },
+          }),
+          setTraceMetadata: (patch) => {
+            metadata = { ...metadata, ...patch };
+          },
           runAction: async (type: string, input: unknown, config?: JsonObject) => {
             const nested = options.registry.get(type);
             if (!nested) throw new Error(`Unknown nested action type: ${type}`);
@@ -76,6 +87,7 @@ export class WorkflowExecutor {
         type: step.type,
         input: resolvedInput,
         output,
+        ...(Object.keys(metadata).length ? { metadata } : {}),
         status: stepStatus,
         error,
         metrics: { startedAt: started, endedAt: new Date(stepEnded).toISOString(), durationMs: stepEnded - stepStarted },

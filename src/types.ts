@@ -48,11 +48,29 @@ export interface WorkflowStep {
   config?: JsonObject;
 }
 
+export interface LlmExecutionMetadata {
+  providerId: string;
+  modelId: string;
+  providerKind: LlmProviderKind;
+  source: "default" | "node";
+  operation: string;
+}
+
+export interface StepTraceMetadata {
+  llm?: LlmExecutionMetadata;
+}
+
+export interface LlmRuntimeLike {
+  run<TOutput = unknown>(type: string, input: unknown, config?: JsonObject): Promise<TOutput>;
+}
+
 export interface ActionContext {
   runId: string;
   stepId: string;
   cwd: string;
   registry: ActionRegistryLike;
+  llm: LlmRuntimeLike;
+  setTraceMetadata(metadata: StepTraceMetadata): void;
   runAction(type: string, input: unknown, config?: JsonObject): Promise<unknown>;
 }
 
@@ -77,6 +95,7 @@ export interface StepTrace {
   type: string;
   input: unknown;
   output: unknown;
+  metadata?: StepTraceMetadata;
   status: StepStatus;
   error: string | null;
   metrics: {
