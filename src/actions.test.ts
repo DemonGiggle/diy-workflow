@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDefaultRegistry } from "./actions/index.js";
 import { faninAction, fanoutAction } from "./actions/control.js";
 import { exactMatchAction } from "./actions/eval.js";
-import { readFileAction } from "./actions/io.js";
-import { readImageAction } from "./actions/image.js";
+import { readFileAction, writeFileAction } from "./actions/io.js";
+import { readImageAction, writeImageAction } from "./actions/image.js";
 import { promptAction, summarizeAction } from "./actions/llm.js";
 import { ocrAction, visionAnalyzeAction } from "./actions/image.js";
 import type { ActionContext } from "./types.js";
@@ -56,6 +56,29 @@ test("read_file reads workspace-relative files and supports mock output", async 
   }
 });
 
+test("write_file writes text output and supports mock mode", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-write-file-"));
+  try {
+    const written = await writeFileAction.run(
+      { path: "outputs/summary.txt", content: "Hello output file" },
+      context(dir),
+    );
+
+    assert.match(written.path, /outputs\/summary\.txt$/);
+    assert.equal(written.bytes, Buffer.byteLength("Hello output file"));
+    assert.equal(await readFile(join(dir, "outputs", "summary.txt"), "utf8"), "Hello output file");
+
+    const mocked = await writeFileAction.run(
+      { path: "outputs/mock.txt", content: "Ignored" },
+      context(dir),
+      { mock: { enabled: true, path: "mock://summary.txt", bytes: 77 } },
+    );
+    assert.deepEqual(mocked, { path: "mock://summary.txt", bytes: 77 });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("read_image reads image metadata and supports mock output", async () => {
   const dir = await mkdtemp(join(tmpdir(), "diy-workflow-images-"));
   try {
@@ -91,6 +114,69 @@ test("read_image reads image metadata and supports mock output", async () => {
       width: 800,
       height: 600,
       image: { path: "mock/input.png", mimeType: "image/png", bytes: 42, width: 800, height: 600 },
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("write_image writes generated image payloads, supports file-backed artifacts, and mocks cleanly", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-write-image-"));
+  try {
+    const generated = await writeImageAction.run(
+      {
+        path: "outputs/generated.png",
+        image: {
+          mimeType: "image/png",
+          data: pngFixture().toString("base64"),
+          width: 1,
+          height: 1,
+        },
+      },
+      context(dir),
+    );
+
+    assert.match(generated.path, /outputs\/generated\.png$/);
+    assert.equal(generated.mimeType, "image/png");
+    assert.equal(generated.bytes, pngFixture().byteLength);
+    assert.deepEqual(await readFile(join(dir, "outputs", "generated.png")), pngFixture());
+
+    await writeFile(join(dir, "source.png"), pngFixture());
+    const source = await readImageAction.run({ path: "source.png" }, context(dir));
+    const copied = await writeImageAction.run(
+      { path: "outputs/copied.png", image: source.image },
+      context(dir),
+    );
+    assert.equal(copied.bytes, pngFixture().byteLength);
+    assert.deepEqual(await readFile(join(dir, "outputs", "copied.png")), pngFixture());
+
+    const mocked = await writeImageAction.run(
+      {
+        path: "outputs/mock.png",
+        image: {
+          mimeType: "image/png",
+          data: pngFixture().toString("base64"),
+        },
+      },
+      context(dir),
+      {
+        mock: {
+          enabled: true,
+          path: "mock://image.png",
+          mimeType: "image/png",
+          bytes: 42,
+          width: 10,
+          height: 20,
+        },
+      },
+    );
+    assert.deepEqual(mocked, {
+      path: "mock://image.png",
+      mimeType: "image/png",
+      bytes: 42,
+      width: 10,
+      height: 20,
+      image: { path: "mock://image.png", mimeType: "image/png", bytes: 42, width: 10, height: 20 },
     });
   } finally {
     await rm(dir, { recursive: true, force: true });

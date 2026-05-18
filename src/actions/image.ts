@@ -1,5 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { basename, extname, resolve } from "node:path";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { basename, dirname, extname, resolve } from "node:path";
 import type { ActionDefinition, JsonObject } from "../types.js";
 import { anyMockValueSchema, readMockConfig } from "./mock.js";
 
@@ -7,6 +7,14 @@ export interface ImageArtifact {
   path: string;
   mimeType: string;
   bytes: number;
+  width?: number;
+  height?: number;
+}
+
+export interface GeneratedImagePayload {
+  mimeType: string;
+  data: string;
+  encoding?: "base64";
   width?: number;
   height?: number;
 }
@@ -36,6 +44,15 @@ interface OcrOutput {
   text: string;
 }
 
+interface WriteImageInput {
+  path: string;
+  image: GeneratedImagePayload | ImageArtifact;
+}
+
+interface WriteImageOutput extends ImageArtifact {
+  image: ImageArtifact;
+}
+
 const JPEG_SOF_MARKERS = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
 const llmSelectionConfigSchema = {
   providerId: { type: "string", minLength: 1, nullable: true },
@@ -50,6 +67,19 @@ export const imageArtifactSchema = {
     path: { type: "string" },
     mimeType: { type: "string" },
     bytes: { type: "number" },
+    width: { type: "number", nullable: true },
+    height: { type: "number", nullable: true },
+  },
+};
+
+export const generatedImagePayloadSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["mimeType", "data"],
+  properties: {
+    mimeType: { type: "string", minLength: 1 },
+    data: { type: "string", minLength: 1 },
+    encoding: { type: "string", enum: ["base64"], nullable: true },
     width: { type: "number", nullable: true },
     height: { type: "number", nullable: true },
   },
@@ -203,6 +233,109 @@ export const ocrAction: ActionDefinition<OcrInput, OcrOutput> = {
   },
 };
 
+export const writeImageAction: ActionDefinition<WriteImageInput, WriteImageOutput> = {
+  type: "io.write_image",
+  description: "Write a generated image payload to a local file.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["path", "image"],
+    properties: {
+      path: { type: "string", minLength: 1 },
+      image: {
+        anyOf: [generatedImagePayloadSchema, imageArtifactSchema],
+      },
+    },
+  },
+  configSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      mock: {
+        type: "object",
+        nullable: true,
+        additionalProperties: false,
+        properties: {
+          enabled: { type: "boolean", nullable: true },
+          path: { type: "string", nullable: true },
+          mimeType: { type: "string", nullable: true },
+          bytes: { type: "number", minimum: 0, nullable: true },
+          width: { type: "number", minimum: 0, nullable: true },
+          height: { type: "number", minimum: 0, nullable: true },
+          image: anyMockValueSchema,
+        },
+      },
+    },
+  },
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["path", "mimeType", "bytes", "image"],
+    properties: {
+      path: { type: "string" },
+      mimeType: { type: "string" },
+      bytes: { type: "number" },
+      width: { type: "number", nullable: true },
+      height: { type: "number", nullable: true },
+      image: imageArtifactSchema,
+    },
+  },
+  async run(input, context, config) {
+    const mock = readMockConfig(config);
+    if (mock) {
+      const destination = typeof mock.path === "string" ? mock.path : input.path;
+      const fallback = buildImageArtifact(
+        destination,
+        typeof mock.mimeType === "string" ? mock.mimeType : input.image.mimeType,
+        typeof mock.bytes === "number" ? mock.bytes : inferImageBytes(input.image),
+        typeof mock.width === "number" ? mock.width : input.image.width,
+        typeof mock.height === "number" ? mock.height : input.image.height,
+      );
+      const artifact = normalizeImageArtifact(mock.image, fallback);
+      return { ...artifact, image: artifact };
+    }
+
+    const absolutePath = resolve(context.cwd, input.path);
+    await mkdir(dirname(absolutePath), { recursive: true });
+
+    if (isGeneratedImagePayload(input.image)) {
+      const buffer = decodeGeneratedImagePayload(input.image);
+      await writeFile(absolutePath, buffer);
+      const dimensions = typeof input.image.width === "number" || typeof input.image.height === "number"
+        ? { width: input.image.width, height: input.image.height }
+        : parseImageDimensions(buffer, input.image.mimeType);
+      const artifact = buildImageArtifact(absolutePath, input.image.mimeType, buffer.length, dimensions.width, dimensions.height);
+      return { ...artifact, image: artifact };
+    }
+
+    const sourcePath = resolve(context.cwd, input.image.path);
+    await copyFile(sourcePath, absolutePath);
+    const artifact = buildImageArtifact(
+      absolutePath,
+      input.image.mimeType,
+      input.image.bytes,
+      input.image.width,
+      input.image.height,
+    );
+    return { ...artifact, image: artifact };
+  },
+  sanitizeTraceInput(input) {
+    if (!isGeneratedImagePayload(input.image)) return input;
+    const bytes = safeInferGeneratedImageBytes(input.image);
+    return {
+      ...input,
+      image: {
+        mimeType: input.image.mimeType,
+        encoding: input.image.encoding ?? "base64",
+        width: input.image.width,
+        height: input.image.height,
+        ...(typeof bytes === "number" ? { bytes } : {}),
+        data: "[omitted]",
+      },
+    };
+  },
+};
+
 function mimeTypeFromPath(path: string): string {
   const extension = extname(path).toLowerCase();
   switch (extension) {
@@ -315,4 +448,37 @@ function normalizeImageArtifact(value: unknown, fallback: ImageArtifact): ImageA
     typeof candidate.width === "number" ? candidate.width : fallback.width,
     typeof candidate.height === "number" ? candidate.height : fallback.height,
   );
+}
+
+function isGeneratedImagePayload(value: GeneratedImagePayload | ImageArtifact): value is GeneratedImagePayload {
+  return "data" in value;
+}
+
+function inferImageBytes(image: GeneratedImagePayload | ImageArtifact): number {
+  return isGeneratedImagePayload(image) ? decodeGeneratedImagePayload(image).length : image.bytes;
+}
+
+function safeInferGeneratedImageBytes(image: GeneratedImagePayload): number | undefined {
+  try {
+    return decodeGeneratedImagePayload(image).length;
+  } catch {
+    return undefined;
+  }
+}
+
+function decodeGeneratedImagePayload(image: GeneratedImagePayload): Buffer {
+  const encoding = image.encoding ?? "base64";
+  if (encoding !== "base64") {
+    throw new Error(`Unsupported image payload encoding: ${encoding}`);
+  }
+
+  const normalized = image.data.replace(/\s+/g, "");
+  if (!isValidBase64(normalized)) {
+    throw new Error("Generated image payload must contain valid base64 data");
+  }
+  return Buffer.from(normalized, "base64");
+}
+
+function isValidBase64(value: string): boolean {
+  return value.length > 0 && value.length % 4 === 0 && /^[A-Za-z0-9+/]+={0,2}$/.test(value);
 }

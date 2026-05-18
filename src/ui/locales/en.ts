@@ -112,6 +112,49 @@ export const en: LocaleResources = {
         image: { label: "Image" },
       },
     },
+    "io.write_file": {
+      label: "Write File",
+      description: "Write text content to a local file.",
+      inputFields: {
+        path: { label: "Path", placeholder: "outputs/output.txt" },
+        content: { label: "Content", placeholder: "Connect or paste text to write" },
+        encoding: { label: "Encoding", placeholder: "utf8" },
+      },
+      configFields: {
+        "mock.enabled": { label: "Mock mode" },
+        "mock.path": { label: "Mock path", placeholder: "mock://output.txt" },
+        "mock.bytes": { label: "Mock bytes" },
+      },
+      outputFields: {
+        path: { label: "Path" },
+        bytes: { label: "Bytes" },
+      },
+    },
+    "io.write_image": {
+      label: "Write Image",
+      description: "Write a generated image payload to a local file.",
+      inputFields: {
+        path: { label: "Path", placeholder: "outputs/output.png" },
+        image: { label: "Image", placeholder: "Connect generated image output or paste JSON payload" },
+      },
+      configFields: {
+        "mock.enabled": { label: "Mock mode" },
+        "mock.path": { label: "Mock path", placeholder: "mock://output.png" },
+        "mock.mimeType": { label: "Mock MIME type", placeholder: "image/png" },
+        "mock.bytes": { label: "Mock bytes" },
+        "mock.width": { label: "Mock width" },
+        "mock.height": { label: "Mock height" },
+        "mock.image": { label: "Mock image" },
+      },
+      outputFields: {
+        path: { label: "Path" },
+        mimeType: { label: "MIME type" },
+        bytes: { label: "Bytes" },
+        width: { label: "Width" },
+        height: { label: "Height" },
+        image: { label: "Image" },
+      },
+    },
     "llm.prompt": {
       label: "Prompt",
       description: "Prompt an AI model. MVP uses deterministic mock output.",

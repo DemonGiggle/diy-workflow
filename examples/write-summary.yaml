@@ -1,0 +1,19 @@
+name: write-summary-demo
+steps:
+  - id: read
+    type: io.read_file
+    input:
+      path: input.txt
+
+  - id: summarize
+    type: llm.summarize
+    input:
+      text: "{{steps.read.output.content}}"
+    config:
+      maxSentences: 2
+
+  - id: write
+    type: io.write_file
+    input:
+      path: outputs/summary.txt
+      content: "{{steps.summarize.output.summary}}"

@@ -43,3 +43,5 @@ jobs:
           node dist/cli.js validate examples/fanout.yaml
           node dist/cli.js validate examples/llm-review.yaml
           node dist/cli.js validate examples/mock-e2e.yaml
+          node dist/cli.js validate examples/write-summary.yaml
+          node dist/cli.js validate examples/write-image.yaml

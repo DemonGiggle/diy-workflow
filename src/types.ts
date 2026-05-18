@@ -86,6 +86,8 @@ export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
   outputSchema: JSONSchemaType<TOutput> | JsonObject;
   configSchema?: JSONSchemaType<JsonObject> | JsonObject;
   run(input: TInput, context: ActionContext, config?: JsonObject): Promise<TOutput>;
+  sanitizeTraceInput?(input: TInput): unknown;
+  sanitizeTraceOutput?(output: TOutput): unknown;
 }
 
 export type StepStatus = "success" | "failed";

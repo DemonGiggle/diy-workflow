@@ -1,0 +1,11 @@
+name: write-image-demo
+steps:
+  - id: write
+    type: io.write_image
+    input:
+      path: outputs/generated.png
+      image:
+        mimeType: image/png
+        data: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2sZl8AAAAASUVORK5CYII=
+        width: 1
+        height: 1

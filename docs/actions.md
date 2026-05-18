@@ -16,6 +16,8 @@ This page is an index. Detailed behavior, input/output fields, mock settings, an
 | --- | --- | --- |
 | `io.read_file` | Read a local file and extract text from common document formats. | [io.read_file](action-reference/io.read_file.md) |
 | `io.read_image` | Read a local image and emit a structured image artifact. | [io.read_image](action-reference/io.read_image.md) |
+| `io.write_file` | Write text content to a local file. | [io.write_file](action-reference/io.write_file.md) |
+| `io.write_image` | Write a generated image payload to a local file. | [io.write_image](action-reference/io.write_image.md) |
 | `llm.prompt` | Render and run a prompt through the MVP mock LLM provider. | [llm.prompt](action-reference/llm.prompt.md) |
 | `llm.vision_analyze` | Analyze an image and describe what it contains. | [llm.vision_analyze](action-reference/llm.vision_analyze.md) |
 | `llm.ocr` | Extract text from an image. | [llm.ocr](action-reference/llm.ocr.md) |

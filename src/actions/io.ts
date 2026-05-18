@@ -1,5 +1,5 @@
-import { readFile, stat } from "node:fs/promises";
-import { extname, resolve } from "node:path";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { dirname, extname, resolve } from "node:path";
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import * as XLSX from "xlsx";
@@ -14,6 +14,17 @@ interface ReadFileInput {
 interface ReadFileOutput {
   path: string;
   content: string;
+  bytes: number;
+}
+
+interface WriteFileInput {
+  path: string;
+  content: string;
+  encoding?: BufferEncoding;
+}
+
+interface WriteFileOutput {
+  path: string;
   bytes: number;
 }
 
@@ -106,5 +117,63 @@ export const readFileAction: ActionDefinition<ReadFileInput, ReadFileOutput> = {
     const absolute = resolve(context.cwd, input.path);
     const [content, info] = await Promise.all([extractTextFromFile(absolute, encoding), stat(absolute)]);
     return { path: absolute, content, bytes: info.size };
+  },
+};
+
+export const writeFileAction: ActionDefinition<WriteFileInput, WriteFileOutput> = {
+  type: "io.write_file",
+  description: "Write text content to a local file.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["path", "content"],
+    properties: {
+      path: { type: "string", minLength: 1 },
+      content: { type: "string" },
+      encoding: { type: "string", nullable: true },
+    },
+  },
+  configSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      mock: {
+        type: "object",
+        nullable: true,
+        additionalProperties: false,
+        properties: {
+          enabled: { type: "boolean", nullable: true },
+          path: { type: "string", nullable: true },
+          bytes: { type: "number", minimum: 0, nullable: true },
+        },
+      },
+    },
+  },
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["path", "bytes"],
+    properties: {
+      path: { type: "string" },
+      bytes: { type: "number" },
+    },
+  },
+  async run(input, context, config) {
+    const encoding = input.encoding ?? "utf8";
+    const mock = readMockConfig(config);
+    if (mock) {
+      return {
+        path: typeof mock.path === "string" ? mock.path : input.path,
+        bytes: typeof mock.bytes === "number" ? mock.bytes : Buffer.byteLength(input.content, encoding),
+      };
+    }
+
+    const absolutePath = resolve(context.cwd, input.path);
+    await mkdir(dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, input.content, encoding);
+    return {
+      path: absolutePath,
+      bytes: Buffer.byteLength(input.content, encoding),
+    };
   },
 };
