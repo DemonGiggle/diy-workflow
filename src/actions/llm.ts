@@ -1,6 +1,11 @@
 import type { ActionDefinition, JsonObject } from "../types.js";
 import { readMockConfig } from "./mock.js";
 
+const llmSelectionConfigSchema = {
+  providerId: { type: "string", minLength: 1, nullable: true },
+  modelId: { type: "string", minLength: 1, nullable: true },
+};
+
 interface PromptInput {
   prompt: string;
   variables?: JsonObject;
@@ -43,6 +48,7 @@ export const promptAction: ActionDefinition<PromptInput, PromptOutput> = {
     type: "object",
     additionalProperties: false,
     properties: {
+      ...llmSelectionConfigSchema,
       mockResponse: { type: "string", nullable: true },
       mock: {
         type: "object",
@@ -91,6 +97,7 @@ export const summarizeAction: ActionDefinition<SummarizeInput, SummarizeOutput> 
     type: "object",
     additionalProperties: false,
     properties: {
+      ...llmSelectionConfigSchema,
       maxSentences: { type: "number", minimum: 1, nullable: true },
       maxChars: { type: "number", minimum: 1, nullable: true },
       mock: {

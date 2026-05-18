@@ -1,4 +1,5 @@
 import { Ajv } from "ajv";
+import { inspectLlmProviderSelection, isLlmActionType, resolveWorkflowProviderCatalog } from "./providers.js";
 import type { ActionRegistry } from "./registry.js";
 import type { ProviderCatalog } from "./types.js";
 import { extractReferences } from "./references.js";
@@ -92,6 +93,7 @@ export class WorkflowValidator {
     this.validateProviderCatalog(workflow.providerCatalog, issues);
     this.validateUniqueStepIds(workflow.steps, issues);
     this.validateActionsAndSchemas(workflow.steps, issues);
+    this.validateLlmProviderSelections(workflow.steps, resolveWorkflowProviderCatalog(workflow), issues);
     this.validateReferences(workflow.steps, issues);
 
     return { ok: issues.length === 0, issues };
@@ -220,6 +222,19 @@ export class WorkflowValidator {
             issues.push({ path: `/steps/${index}/config${error.instancePath}`, message: error.message ?? "invalid config" });
           }
         }
+      }
+    });
+  }
+
+  private validateLlmProviderSelections(steps: WorkflowStep[], catalog: ProviderCatalog, issues: ValidationIssue[]): void {
+    steps.forEach((step, index) => {
+      if (!isLlmActionType(step.type)) return;
+      const selection = inspectLlmProviderSelection(catalog, step.type, step.config);
+      for (const issue of selection.issues) {
+        issues.push({
+          path: `/steps/${index}/config/${issue.field}`,
+          message: issue.message,
+        });
       }
     });
   }

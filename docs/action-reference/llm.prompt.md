@@ -23,6 +23,8 @@ Renders and runs a prompt through the MVP mock LLM provider.
 
 | Field | Type | Description |
 | --- | --- | --- |
+| `providerId` | string | Optional node-level provider override. When set, `modelId` must also be set. |
+| `modelId` | string | Optional node-level model override for the selected provider. |
 | `mockResponse` | string | Legacy deterministic response shortcut. Prefer `mock.response` for new workflows. |
 
 ## Mock Config

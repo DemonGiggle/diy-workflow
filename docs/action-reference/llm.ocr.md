@@ -22,6 +22,8 @@ This action accepts an image artifact and returns extracted text. The MVP runtim
 
 | Field | Type | Description |
 | --- | --- | --- |
+| `providerId` | string | Optional node-level provider override. When set, `modelId` must also be set. |
+| `modelId` | string | Optional node-level model override. Selected models must advertise `vision` capability. |
 | mock.enabled | boolean | Enables deterministic mock output. |
 | mock.response | string | Mock OCR text. |
 
@@ -55,4 +57,3 @@ steps:
         enabled: true
         response: Detected image text.
 ~~~
-

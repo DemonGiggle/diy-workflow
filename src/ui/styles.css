@@ -67,6 +67,8 @@ input[type="checkbox"] { width: 18px; height: 18px; padding: 0; }
 textarea { min-height: 82px; resize: vertical; line-height: 1.4; }
 .field-editor { margin-bottom: 10px; }
 .field-editor select { margin-top: 3px; }
+.llm-selection-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 8px; }
+.field-error { margin: 6px 0 0; color: #b42318; font-size: 12px; line-height: 1.4; }
 .output-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .output-list code { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; background: #eef2f7; border-radius: 5px; font-size: 12px; }
 .output-list span { color: #667085; font-size: 11px; }
