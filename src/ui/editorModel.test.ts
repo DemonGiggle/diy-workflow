@@ -1,6 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addStep, availableConnections, connectCompatibleField, connectField, createInitialEditorState, getWorkflowConnections, isCompatibleConnection, moveStep, removeStep, updateStepConfig, updateStepInput } from "./editorModel.js";
+import {
+  addProvider,
+  addProviderModel,
+  addStep,
+  availableConnections,
+  connectCompatibleField,
+  connectField,
+  createInitialEditorState,
+  getProviderCatalog,
+  getWorkflowConnections,
+  isCompatibleConnection,
+  moveStep,
+  removeProvider,
+  removeProviderModel,
+  removeStep,
+  setDefaultModel,
+  setDefaultProvider,
+  updateProviderField,
+  updateProviderModelCapability,
+  updateProviderModelField,
+  updateStepConfig,
+  updateStepInput,
+} from "./editorModel.js";
 
 test("editor model adds, moves, and removes nodes", () => {
   let state = createInitialEditorState();
@@ -113,6 +135,57 @@ test("editor model wires image outputs only into image inputs", () => {
 
   const result = connectCompatibleField(state, ocr.id, "image", readImage.id, "image");
   assert.equal(result.ok, true);
+});
+
+test("editor model manages provider catalog defaults and provider fields", () => {
+  let state = createInitialEditorState();
+  state = addProvider(state);
+  state = updateProviderField(state, 1, "id", "openai");
+  state = updateProviderField(state, 1, "label", "OpenAI");
+  state = setDefaultProvider(state, "openai");
+
+  const catalog = getProviderCatalog(state);
+  assert.equal(catalog.providers[1]?.id, "openai");
+  assert.equal(catalog.defaultProviderId, "openai");
+  assert.equal(catalog.defaultModelId, "model_1");
+});
+
+test("editor model manages provider models and capabilities", () => {
+  let state = createInitialEditorState();
+  state = addProvider(state);
+  state = updateProviderField(state, 1, "id", "openai");
+  state = addProviderModel(state, 1);
+  state = updateProviderModelField(state, 1, 1, "id", "gpt-4.1-mini");
+  state = updateProviderModelField(state, 1, 1, "label", "GPT-4.1 Mini");
+  state = updateProviderModelField(state, 1, 1, "contextWindow", 128000);
+  state = updateProviderModelCapability(state, 1, 1, "vision", true);
+  state = setDefaultProvider(state, "openai");
+  state = setDefaultModel(state, "gpt-4.1-mini");
+
+  const catalog = getProviderCatalog(state);
+  const model = catalog.providers[1]?.models[1];
+  assert.equal(catalog.defaultModelId, "gpt-4.1-mini");
+  assert.equal(model?.label, "GPT-4.1 Mini");
+  assert.equal(model?.contextWindow, 128000);
+  assert.equal(model?.capabilities?.vision, true);
+});
+
+test("editor model resets defaults when removing providers or models", () => {
+  let state = createInitialEditorState();
+  state = addProvider(state);
+  state = updateProviderField(state, 1, "id", "openai");
+  state = addProviderModel(state, 1);
+  state = updateProviderModelField(state, 1, 1, "id", "gpt-4.1-mini");
+  state = setDefaultProvider(state, "openai");
+  state = setDefaultModel(state, "gpt-4.1-mini");
+  state = removeProviderModel(state, 1, 1);
+
+  let catalog = getProviderCatalog(state);
+  assert.equal(catalog.defaultModelId, "model_1");
+
+  state = removeProvider(state, 1);
+  catalog = getProviderCatalog(state);
+  assert.equal(catalog.defaultProviderId, "mock");
 });
 
 function summarizeInput(state: ReturnType<typeof createInitialEditorState>): unknown {

@@ -1,4 +1,5 @@
-import type { JsonObject, StepTrace, WorkflowDocument, WorkflowStep } from "../types.js";
+import { createDefaultProviderCatalog } from "../providers.js";
+import type { JsonObject, ProviderCatalog, StepTrace, WorkflowDocument, WorkflowStep } from "../types.js";
 import { createStep, getEditorAction, type FieldDescriptor, type FieldKind, type OutputDescriptor } from "./actionCatalog.js";
 
 export interface NodePosition {
@@ -39,7 +40,7 @@ export function createInitialEditorState(): EditorState {
   prompt.input = { prompt: referenceFor(read.id, "content") };
   summarize.input = { text: referenceFor(prompt.id, "text") };
   return {
-    workflow: { name: "visual-workflow", steps: [read, prompt, summarize] },
+    workflow: { name: "visual-workflow", providerCatalog: createDefaultProviderCatalog(), steps: [read, prompt, summarize] },
     selectedStepId: prompt.id,
     positions: {
       [read.id]: { x: 72, y: 92 },
@@ -187,6 +188,161 @@ export function buildMockTrace(workflow: WorkflowDocument): StepTrace[] {
   }));
 }
 
+export function addProvider(state: EditorState): EditorState {
+  return updateProviderCatalog(state, (catalog) => {
+    const nextProviderNumber = catalog.providers.length + 1;
+    catalog.providers.push({
+      id: `provider_${nextProviderNumber}`,
+      label: `Provider ${nextProviderNumber}`,
+      kind: "openai-compatible",
+      enabled: true,
+      models: [
+        {
+          id: "model_1",
+          label: "Model 1",
+          enabled: true,
+          capabilities: { text: true },
+        },
+      ],
+    });
+
+    if (!catalog.defaultProviderId) {
+      catalog.defaultProviderId = catalog.providers[0]?.id;
+      catalog.defaultModelId = catalog.providers[0]?.models[0]?.id;
+    }
+  });
+}
+
+export function updateProviderField(
+  state: EditorState,
+  providerIndex: number,
+  field: "id" | "label" | "kind" | "baseUrl" | "apiKeyRef" | "enabled",
+  value: unknown,
+): EditorState {
+  return updateProviderCatalog(state, (catalog) => {
+    const provider = catalog.providers[providerIndex];
+    if (!provider) return;
+    switch (field) {
+      case "id":
+        provider.id = typeof value === "string" ? value : provider.id;
+        return;
+      case "label":
+        provider.label = typeof value === "string" ? value : provider.label;
+        return;
+      case "baseUrl":
+        provider.baseUrl = typeof value === "string" ? value : undefined;
+        return;
+      case "apiKeyRef":
+        provider.apiKeyRef = typeof value === "string" ? value : undefined;
+        return;
+      case "kind":
+        provider.kind = value as typeof provider.kind;
+        return;
+      case "enabled":
+        provider.enabled = value === true;
+        return;
+    }
+  });
+}
+
+export function removeProvider(state: EditorState, providerIndex: number): EditorState {
+  return updateProviderCatalog(state, (catalog) => {
+    const [removed] = catalog.providers.splice(providerIndex, 1);
+    if (!removed) return;
+    if (catalog.defaultProviderId === removed.id) {
+      catalog.defaultProviderId = catalog.providers[0]?.id;
+      catalog.defaultModelId = catalog.providers[0]?.models[0]?.id;
+    }
+  });
+}
+
+export function addProviderModel(state: EditorState, providerIndex: number): EditorState {
+  return updateProviderCatalog(state, (catalog) => {
+    const provider = catalog.providers[providerIndex];
+    if (!provider) return;
+    const nextModelNumber = provider.models.length + 1;
+    provider.models.push({
+      id: `model_${nextModelNumber}`,
+      label: `Model ${nextModelNumber}`,
+      enabled: true,
+      capabilities: { text: true },
+    });
+    if (catalog.defaultProviderId === provider.id && !catalog.defaultModelId) {
+      catalog.defaultModelId = provider.models[0]?.id;
+    }
+  });
+}
+
+export function updateProviderModelField(
+  state: EditorState,
+  providerIndex: number,
+  modelIndex: number,
+  field: "id" | "label" | "contextWindow" | "enabled",
+  value: unknown,
+): EditorState {
+  return updateProviderCatalog(state, (catalog) => {
+    const model = catalog.providers[providerIndex]?.models[modelIndex];
+    if (!model) return;
+    switch (field) {
+      case "id":
+      case "label":
+        model[field] = typeof value === "string" ? value : "";
+        return;
+      case "contextWindow":
+        model.contextWindow = typeof value === "number" ? value : undefined;
+        return;
+      case "enabled":
+        model.enabled = value === true;
+        return;
+    }
+  });
+}
+
+export function updateProviderModelCapability(
+  state: EditorState,
+  providerIndex: number,
+  modelIndex: number,
+  capability: "text" | "vision" | "structuredOutput" | "tools",
+  enabled: boolean,
+): EditorState {
+  return updateProviderCatalog(state, (catalog) => {
+    const model = catalog.providers[providerIndex]?.models[modelIndex];
+    if (!model) return;
+    model.capabilities = { ...model.capabilities, [capability]: enabled };
+  });
+}
+
+export function removeProviderModel(state: EditorState, providerIndex: number, modelIndex: number): EditorState {
+  return updateProviderCatalog(state, (catalog) => {
+    const provider = catalog.providers[providerIndex];
+    if (!provider) return;
+    const [removed] = provider.models.splice(modelIndex, 1);
+    if (!removed) return;
+    if (catalog.defaultProviderId === provider.id && catalog.defaultModelId === removed.id) {
+      catalog.defaultModelId = provider.models[0]?.id;
+    }
+  });
+}
+
+export function setDefaultProvider(state: EditorState, providerId: string): EditorState {
+  return updateProviderCatalog(state, (catalog) => {
+    const provider = catalog.providers.find((item) => item.id === providerId);
+    if (!provider) return;
+    catalog.defaultProviderId = provider.id;
+    catalog.defaultModelId = provider.models[0]?.id;
+  });
+}
+
+export function setDefaultModel(state: EditorState, modelId: string): EditorState {
+  return updateProviderCatalog(state, (catalog) => {
+    catalog.defaultModelId = modelId;
+  });
+}
+
+export function getProviderCatalog(state: EditorState): ProviderCatalog {
+  return state.workflow.providerCatalog ?? createDefaultProviderCatalog();
+}
+
 function mockOutputFor(step: WorkflowStep, index: number): unknown {
   switch (step.type) {
     case "io.read_file": return { path: asObject(step.input).path ?? "input.txt", content: "Preview file content", bytes: 20 };
@@ -208,6 +364,18 @@ function mockOutputFor(step: WorkflowStep, index: number): unknown {
 
 function updateStep(state: EditorState, stepId: string, fn: (step: WorkflowStep) => WorkflowStep): EditorState {
   return { ...state, workflow: { ...state.workflow, steps: state.workflow.steps.map((step) => step.id === stepId ? fn(step) : step) } };
+}
+
+function updateProviderCatalog(state: EditorState, mutate: (catalog: ProviderCatalog) => void): EditorState {
+  const catalog = cloneProviderCatalog(getProviderCatalog(state));
+  mutate(catalog);
+  return {
+    ...state,
+    workflow: {
+      ...state.workflow,
+      providerCatalog: catalog,
+    },
+  };
 }
 
 function asObject(value: unknown): JsonObject {
@@ -235,4 +403,18 @@ function extractFieldReferences(value: unknown): Array<{ stepId: string; field: 
   if (typeof value !== "string") return [];
   return [...value.matchAll(/{{\s*steps\.([A-Za-z0-9_-]+)\.output\.([A-Za-z0-9_.-]+)\s*}}/g)]
     .map((match) => ({ stepId: match[1]!, field: match[2]! }));
+}
+
+function cloneProviderCatalog(catalog: ProviderCatalog): ProviderCatalog {
+  return {
+    defaultProviderId: catalog.defaultProviderId,
+    defaultModelId: catalog.defaultModelId,
+    providers: catalog.providers.map((provider) => ({
+      ...provider,
+      models: provider.models.map((model) => ({
+        ...model,
+        capabilities: model.capabilities ? { ...model.capabilities } : undefined,
+      })),
+    })),
+  };
 }

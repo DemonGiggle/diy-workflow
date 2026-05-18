@@ -1,19 +1,29 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Cable, CirclePlay, Copy, FileCode2, Grip, Plus, Trash2 } from "lucide-react";
+import { Cable, CirclePlay, Copy, FileCode2, Grip, Plus, Settings2, Trash2 } from "lucide-react";
 import YAML from "yaml";
-import type { RunTrace, WorkflowStep } from "../types.js";
+import type { LlmProviderKind, RunTrace, WorkflowStep } from "../types.js";
 import { editorActions, getEditorAction, type EditorActionDefinition, type FieldDescriptor } from "./actionCatalog.js";
 import {
+  addProvider,
+  addProviderModel,
   addStep,
   availableConnections,
   connectCompatibleField,
   connectField,
   createInitialEditorState,
+  getProviderCatalog,
   getWorkflowConnections,
   isCompatibleConnection,
   moveStep,
+  removeProvider,
+  removeProviderModel,
   removeStep,
+  setDefaultModel,
+  setDefaultProvider,
+  updateProviderField,
+  updateProviderModelCapability,
+  updateProviderModelField,
   updateStepConfig,
   updateStepInput,
   type EditorState,
@@ -30,6 +40,7 @@ function App() {
   const [trace, setTrace] = useState<RunTrace | null>(null);
   const [runs, setRuns] = useState<string[]>([]);
   const [locale, setLocale] = useState<Locale>(() => readStoredLocale());
+  const [view, setView] = useState<"workflow" | "providers">("workflow");
   const t = useMemo(() => createTranslator(locale), [locale]);
   const [statusMessage, setStatusMessage] = useState<string>(() => t("run.ready"));
   const [isRunning, setIsRunning] = useState(false);
@@ -78,6 +89,10 @@ function App() {
           <span>{t("app.subtitle")}</span>
         </div>
         <div className="topbar-actions">
+          <div className="view-switch" role="tablist" aria-label="Editor view">
+            <button className={view === "workflow" ? "secondary active-tab" : "secondary"} onClick={() => setView("workflow")}>{t("view.workflow")}</button>
+            <button className={view === "providers" ? "secondary active-tab" : "secondary"} onClick={() => setView("providers")}>{t("view.providers")}</button>
+          </div>
           <label className="locale-picker">
             <span>{t("locale.label")}</span>
             <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
@@ -90,10 +105,21 @@ function App() {
       </header>
 
       <section className="workspace">
-        <ActionPalette locale={locale} t={t} onAdd={(type) => setState((current) => addStep(current, type))} />
-        <Canvas state={state} locale={locale} t={t} setState={setState} />
+        {view === "workflow" ? (
+          <>
+            <ActionPalette locale={locale} t={t} onAdd={(type) => setState((current) => addStep(current, type))} />
+            <Canvas state={state} locale={locale} t={t} setState={setState} />
+          </>
+        ) : (
+          <>
+            <ProvidersSummary state={state} t={t} />
+            <ProviderSettings state={state} t={t} setState={setState} />
+          </>
+        )}
         <aside className="side-panel">
-          {selectedStep ? <Inspector state={state} step={selectedStep} locale={locale} t={t} setState={setState} /> : <EmptyInspector t={t} />}
+          {view === "workflow"
+            ? selectedStep ? <Inspector state={state} step={selectedStep} locale={locale} t={t} setState={setState} /> : <EmptyInspector t={t} />
+            : <ProviderDefaultsPanel state={state} t={t} setState={setState} />}
           <YamlPanel yaml={yaml} t={t} />
           <TracePanel trace={trace} runs={runs} statusMessage={statusMessage} t={t} onRefresh={() => refreshRuns(setRuns, setStatusMessage, t)} onShowRun={inspectRun} />
         </aside>
@@ -359,6 +385,123 @@ function FieldEditor({ field, t, value, connections, onChange, onConnect }: {
         </select>
       )}
     </label>
+  );
+}
+
+function ProvidersSummary({ state, t }: { state: EditorState; t: Translator }) {
+  const catalog = getProviderCatalog(state);
+  return (
+    <aside className="palette providers-summary">
+      <div className="panel-heading">
+        <Settings2 size={16}/>
+        <h2>{t("providers.title")}</h2>
+      </div>
+      <p className="muted">{catalog.providers.length} provider(s)</p>
+      {catalog.providers.map((provider) => (
+        <section key={provider.id} className="palette-group">
+          <h3>{provider.label}</h3>
+          <p className="summary-line">{provider.id} · {provider.kind}</p>
+          <p className="summary-line">{provider.models.length} model(s)</p>
+        </section>
+      ))}
+    </aside>
+  );
+}
+
+function ProviderSettings({ state, t, setState }: { state: EditorState; t: Translator; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
+  const catalog = getProviderCatalog(state);
+  const providerKinds: LlmProviderKind[] = ["openai-compatible", "anthropic", "gemini", "mock", "custom"];
+
+  return (
+    <section className="provider-settings">
+      <div className="panel-heading">
+        <Settings2 size={16}/>
+        <h2>{t("providers.title")}</h2>
+      </div>
+      {catalog.providers.length === 0 && <p className="muted">{t("providers.empty")}</p>}
+      <div className="provider-list">
+        {catalog.providers.map((provider, providerIndex) => (
+          <article key={`${provider.id}-${providerIndex}`} className="provider-card">
+            <div className="provider-card-header">
+              <div>
+                <strong>{provider.label}</strong>
+                <span>{provider.id}</span>
+              </div>
+              <button className="danger small" onClick={() => setState((current) => removeProvider(current, providerIndex))}><Trash2 size={15}/> {t("providers.deleteProvider")}</button>
+            </div>
+
+            <div className="provider-grid">
+              <label><span>{t("providers.providerId")}</span><input value={provider.id} onChange={(event) => setState((current) => updateProviderField(current, providerIndex, "id", event.target.value))} /></label>
+              <label><span>{t("providers.providerLabel")}</span><input value={provider.label} onChange={(event) => setState((current) => updateProviderField(current, providerIndex, "label", event.target.value))} /></label>
+              <label>
+                <span>{t("providers.providerKind")}</span>
+                <select value={provider.kind} onChange={(event) => setState((current) => updateProviderField(current, providerIndex, "kind", event.target.value))}>
+                  {providerKinds.map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+                </select>
+              </label>
+              <label><span>{t("providers.enabled")}</span><input type="checkbox" checked={provider.enabled !== false} onChange={(event) => setState((current) => updateProviderField(current, providerIndex, "enabled", event.target.checked))} /></label>
+              <label><span>{t("providers.baseUrl")}</span><input value={provider.baseUrl ?? ""} onChange={(event) => setState((current) => updateProviderField(current, providerIndex, "baseUrl", event.target.value))} /></label>
+              <label><span>{t("providers.apiKeyRef")}</span><input value={provider.apiKeyRef ?? ""} onChange={(event) => setState((current) => updateProviderField(current, providerIndex, "apiKeyRef", event.target.value))} /></label>
+            </div>
+
+            <div className="provider-models">
+              {provider.models.map((model, modelIndex) => (
+                <section key={`${model.id}-${modelIndex}`} className="model-card">
+                  <div className="provider-card-header">
+                    <div>
+                      <strong>{model.label}</strong>
+                      <span>{model.id}</span>
+                    </div>
+                    <button className="secondary small" onClick={() => setState((current) => removeProviderModel(current, providerIndex, modelIndex))}><Trash2 size={15}/> {t("providers.deleteModel")}</button>
+                  </div>
+                  <div className="provider-grid">
+                    <label><span>{t("providers.modelId")}</span><input value={model.id} onChange={(event) => setState((current) => updateProviderModelField(current, providerIndex, modelIndex, "id", event.target.value))} /></label>
+                    <label><span>{t("providers.modelLabel")}</span><input value={model.label} onChange={(event) => setState((current) => updateProviderModelField(current, providerIndex, modelIndex, "label", event.target.value))} /></label>
+                    <label><span>{t("providers.contextWindow")}</span><input type="number" value={model.contextWindow ?? ""} onChange={(event) => setState((current) => updateProviderModelField(current, providerIndex, modelIndex, "contextWindow", event.target.value === "" ? undefined : Number(event.target.value)))} /></label>
+                    <label><span>{t("providers.enabled")}</span><input type="checkbox" checked={model.enabled !== false} onChange={(event) => setState((current) => updateProviderModelField(current, providerIndex, modelIndex, "enabled", event.target.checked))} /></label>
+                  </div>
+                  <div className="capability-group">
+                    <span>{t("providers.capabilities")}</span>
+                    <label><input type="checkbox" checked={model.capabilities?.text === true} onChange={(event) => setState((current) => updateProviderModelCapability(current, providerIndex, modelIndex, "text", event.target.checked))} />{t("providers.capability.text")}</label>
+                    <label><input type="checkbox" checked={model.capabilities?.vision === true} onChange={(event) => setState((current) => updateProviderModelCapability(current, providerIndex, modelIndex, "vision", event.target.checked))} />{t("providers.capability.vision")}</label>
+                    <label><input type="checkbox" checked={model.capabilities?.structuredOutput === true} onChange={(event) => setState((current) => updateProviderModelCapability(current, providerIndex, modelIndex, "structuredOutput", event.target.checked))} />{t("providers.capability.structuredOutput")}</label>
+                    <label><input type="checkbox" checked={model.capabilities?.tools === true} onChange={(event) => setState((current) => updateProviderModelCapability(current, providerIndex, modelIndex, "tools", event.target.checked))} />{t("providers.capability.tools")}</label>
+                  </div>
+                </section>
+              ))}
+              <button className="secondary" onClick={() => setState((current) => addProviderModel(current, providerIndex))}><Plus size={16}/> {t("providers.addModel")}</button>
+            </div>
+          </article>
+        ))}
+      </div>
+      <button onClick={() => setState((current) => addProvider(current))}><Plus size={16}/> {t("providers.addProvider")}</button>
+    </section>
+  );
+}
+
+function ProviderDefaultsPanel({ state, t, setState }: { state: EditorState; t: Translator; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
+  const catalog = getProviderCatalog(state);
+  const selectedProvider = catalog.providers.find((provider) => provider.id === catalog.defaultProviderId) ?? catalog.providers[0];
+
+  return (
+    <section className="inspector">
+      <div className="panel-heading">
+        <Settings2 size={16}/>
+        <h2>{t("providers.defaults")}</h2>
+      </div>
+      <label>
+        <span>{t("providers.defaultProvider")}</span>
+        <select value={catalog.defaultProviderId ?? ""} onChange={(event) => setState((current) => setDefaultProvider(current, event.target.value))}>
+          {catalog.providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.label} ({provider.id})</option>)}
+        </select>
+      </label>
+      <label>
+        <span>{t("providers.defaultModel")}</span>
+        <select value={catalog.defaultModelId ?? ""} onChange={(event) => setState((current) => setDefaultModel(current, event.target.value))}>
+          {(selectedProvider?.models ?? []).map((model) => <option key={model.id} value={model.id}>{model.label} ({model.id})</option>)}
+        </select>
+      </label>
+    </section>
   );
 }
 
