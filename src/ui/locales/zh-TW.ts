@@ -112,6 +112,49 @@ export const zhTw: LocaleResources = {
         image: { label: "圖片" },
       },
     },
+    "io.write_file": {
+      label: "寫入檔案",
+      description: "將文字內容寫入本機檔案。",
+      inputFields: {
+        path: { label: "路徑", placeholder: "outputs/output.txt" },
+        content: { label: "內容", placeholder: "連接或貼上要寫入的文字" },
+        encoding: { label: "編碼", placeholder: "utf8" },
+      },
+      configFields: {
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.path": { label: "Mock 路徑", placeholder: "mock://output.txt" },
+        "mock.bytes": { label: "Mock 位元組數" },
+      },
+      outputFields: {
+        path: { label: "路徑" },
+        bytes: { label: "位元組數" },
+      },
+    },
+    "io.write_image": {
+      label: "寫入圖片",
+      description: "將生成的圖片 payload 寫入本機檔案。",
+      inputFields: {
+        path: { label: "路徑", placeholder: "outputs/output.png" },
+        image: { label: "圖片", placeholder: "連接生成圖片輸出，或貼上 JSON payload" },
+      },
+      configFields: {
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.path": { label: "Mock 路徑", placeholder: "mock://output.png" },
+        "mock.mimeType": { label: "Mock MIME 類型", placeholder: "image/png" },
+        "mock.bytes": { label: "Mock 位元組數" },
+        "mock.width": { label: "Mock 寬度" },
+        "mock.height": { label: "Mock 高度" },
+        "mock.image": { label: "Mock 圖片" },
+      },
+      outputFields: {
+        path: { label: "路徑" },
+        mimeType: { label: "MIME 類型" },
+        bytes: { label: "位元組數" },
+        width: { label: "寬度" },
+        height: { label: "高度" },
+        image: { label: "圖片" },
+      },
+    },
     "llm.prompt": {
       label: "提示詞",
       description: "向 AI model 發送 prompt。MVP 使用可重現的 mock 輸出。",

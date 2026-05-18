@@ -121,3 +121,10 @@ Validate and run the provider-routing example:
 node dist/cli.js validate examples/provider-routing.yaml
 node dist/cli.js run examples/provider-routing.yaml
 ~~~
+
+Validate the output-action examples:
+
+~~~sh
+node dist/cli.js validate examples/write-summary.yaml
+node dist/cli.js validate examples/write-image.yaml
+~~~

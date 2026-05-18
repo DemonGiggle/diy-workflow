@@ -170,6 +170,26 @@ test("validator rejects node model selections that lack required vision capabili
   assert.match(result.issues.map((issue) => issue.message).join("\n"), /does not support vision/);
 });
 
+test("validator rejects malformed generated image payloads for io.write_image", () => {
+  const workflow: WorkflowDocument = {
+    steps: [
+      {
+        id: "write",
+        type: "io.write_image",
+        input: {
+          path: "outputs/generated.png",
+          image: {
+            mimeType: "image/png",
+          },
+        },
+      },
+    ],
+  };
+  const result = new WorkflowValidator(createDefaultRegistry()).validate(workflow);
+  assert.equal(result.ok, false);
+  assert.match(result.issues.map((issue) => issue.path).join("\n"), /\/steps\/0\/input\/image/);
+});
+
 test("executor runs workflow, resolves references, and saves trace", async () => {
   const dir = await mkdtemp(join(tmpdir(), "diy-workflow-"));
   try {
@@ -191,6 +211,99 @@ test("executor runs workflow, resolves references, and saves trace", async () =>
     assert.equal(trace.status, "success");
     assert.equal(trace.steps.length, 3);
     assert.deepEqual(trace.steps[2]?.output, { matched: true, actual: "One. Two.", expected: "One. Two." });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("executor writes text and generated image outputs to disk", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-output-actions-"));
+  try {
+    const workflow: WorkflowDocument = {
+      name: "output-actions",
+      steps: [
+        {
+          id: "summary",
+          type: "llm.summarize",
+          input: { text: "One sentence. Two sentence. Three sentence." },
+          config: { maxSentences: 2 },
+        },
+        {
+          id: "write_text",
+          type: "io.write_file",
+          input: {
+            path: "outputs/summary.txt",
+            content: "{{steps.summary.output.summary}}",
+          },
+        },
+        {
+          id: "write_image",
+          type: "io.write_image",
+          input: {
+            path: "outputs/generated.png",
+            image: {
+              mimeType: "image/png",
+              data: pngFixture().toString("base64"),
+              width: 1,
+              height: 1,
+            },
+          },
+        },
+      ],
+    };
+
+    const traceStore = new TraceStore(join(dir, "runs"));
+    const trace = await new WorkflowExecutor().execute({
+      workflowPath: join(dir, "workflow.yaml"),
+      workflow,
+      registry: createDefaultRegistry(),
+      traceStore,
+    });
+
+    assert.equal(trace.status, "success");
+    assert.equal(await readFile(join(dir, "outputs", "summary.txt"), "utf8"), "One sentence. Two sentence.");
+    assert.deepEqual(await readFile(join(dir, "outputs", "generated.png")), pngFixture());
+    assert.deepEqual(trace.steps[1]?.output, {
+      path: join(dir, "outputs", "summary.txt"),
+      bytes: Buffer.byteLength("One sentence. Two sentence."),
+    });
+    assert.equal((trace.steps[2]?.output as { mimeType?: string }).mimeType, "image/png");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("executor omits raw base64 image payloads from saved traces", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-output-trace-"));
+  const imageBase64 = pngFixture().toString("base64");
+  try {
+    const workflow: WorkflowDocument = {
+      name: "trace-safe-image-output",
+      steps: [
+        {
+          id: "write_image",
+          type: "io.write_image",
+          input: {
+            path: "outputs/generated.png",
+            image: {
+              mimeType: "image/png",
+              data: imageBase64,
+            },
+          },
+        },
+      ],
+    };
+
+    const trace = await new WorkflowExecutor().execute({
+      workflowPath: join(dir, "workflow.yaml"),
+      workflow,
+      registry: createDefaultRegistry(),
+      traceStore: new TraceStore(join(dir, "runs")),
+    });
+
+    const saved = await readFile(join(dir, "runs", trace.runId, "trace.json"), "utf8");
+    assert.doesNotMatch(saved, new RegExp(imageBase64));
+    assert.match(saved, /"\[omitted\]"/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -318,6 +431,13 @@ test("saved traces do not include provider apiKeyRef or secret values", async ()
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+function pngFixture(): Buffer {
+  return Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2sZl8AAAAASUVORK5CYII=",
+    "base64",
+  );
+}
 
 test("executor supports action-level mock mode for deterministic e2e runs", async () => {
   const dir = await mkdtemp(join(tmpdir(), "diy-workflow-"));

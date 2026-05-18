@@ -40,6 +40,8 @@ export class WorkflowExecutor {
       const started = new Date(stepStarted).toISOString();
       let resolvedInput: unknown = null;
       let output: unknown = null;
+      let traceInput: unknown = null;
+      let traceOutput: unknown = null;
       let error: string | null = null;
       let metadata = {};
       let stepStatus: "success" | "failed" = "success";
@@ -74,19 +76,24 @@ export class WorkflowExecutor {
 
         output = await action.run(resolvedInput as never, context, step.config);
         this.assertSchema(action.outputSchema, output, `Output for ${step.id}`);
+        traceInput = action.sanitizeTraceInput ? action.sanitizeTraceInput(resolvedInput as never) : resolvedInput;
+        traceOutput = action.sanitizeTraceOutput ? action.sanitizeTraceOutput(output as never) : output;
         stepOutputs.set(step.id, { output });
       } catch (caught) {
         stepStatus = "failed";
         status = "failed";
         error = caught instanceof Error ? caught.message : String(caught);
+        if (traceInput === null) {
+          traceInput = action.sanitizeTraceInput ? action.sanitizeTraceInput(resolvedInput as never) : resolvedInput;
+        }
       }
 
       const stepEnded = Date.now();
       steps.push({
         id: step.id,
         type: step.type,
-        input: resolvedInput,
-        output,
+        input: traceInput,
+        output: traceOutput ?? output,
         ...(Object.keys(metadata).length ? { metadata } : {}),
         status: stepStatus,
         error,

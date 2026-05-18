@@ -538,7 +538,7 @@ function FieldEditor({ field, t, value, connections, onChange, onConnect }: {
         <input type="checkbox" checked={value === true} onChange={(event) => onChange(event.target.checked)} />
       ) : field.kind === "number" ? (
         <input type="number" value={value === undefined ? "" : String(value)} placeholder={field.placeholder} onChange={(event) => onChange(event.target.value === "" ? undefined : Number(event.target.value))} />
-      ) : field.kind === "json" || field.kind === "array" ? (
+      ) : field.kind === "json" || field.kind === "array" || field.kind === "image" ? (
         <textarea value={jsonValue(value)} placeholder={field.placeholder ?? "JSON or reference"} onChange={(event) => onChange(parseJsonish(event.target.value))} />
       ) : (
         <input value={stringValue(value)} placeholder={field.placeholder} onChange={(event) => onChange(event.target.value)} />
