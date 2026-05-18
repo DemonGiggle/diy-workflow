@@ -11,6 +11,7 @@ import { readImageAction } from "./actions/image.js";
 import { promptAction, summarizeAction } from "./actions/llm.js";
 import { ocrAction, visionAnalyzeAction } from "./actions/image.js";
 import type { ActionContext } from "./types.js";
+import { createLlmRuntime } from "./llmRuntime.js";
 import { Document, Packer, Paragraph } from "docx";
 import PDFDocument from "pdfkit";
 import * as XLSX from "xlsx";
@@ -18,11 +19,14 @@ import * as XLSX from "xlsx";
 const registry = createDefaultRegistry();
 
 function context(cwd = process.cwd()): ActionContext {
+  const traceMetadata = {};
   return {
     runId: "run_test",
     stepId: "step_test",
     cwd,
     registry,
+    llm: createLlmRuntime({ workflow: {}, setTraceMetadata: (patch) => Object.assign(traceMetadata, patch) }),
+    setTraceMetadata: (patch) => Object.assign(traceMetadata, patch),
     runAction: async (type, input, config) => {
       const action = registry.get(type);
       if (!action) throw new Error(`Unknown nested action type: ${type}`);

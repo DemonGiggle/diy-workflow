@@ -70,7 +70,6 @@ export const readImageAction: ActionDefinition<ReadImageInput, ReadImageOutput> 
     type: "object",
     additionalProperties: false,
     properties: {
-      ...llmSelectionConfigSchema,
       mock: {
         type: "object",
         nullable: true,
@@ -159,12 +158,8 @@ export const visionAnalyzeAction: ActionDefinition<VisionAnalyzeInput, VisionAna
       },
     },
   },
-  async run(input, _context, config) {
-    const mock = readMockConfig(config);
-    const text = typeof mock?.response === "string"
-      ? mock.response
-      : renderVisionPreview(input.image, input.prompt);
-    return { text };
+  async run(input, context, config) {
+    return await context.llm.run<VisionAnalyzeOutput>("llm.vision_analyze", input, config);
   },
 };
 
@@ -191,6 +186,7 @@ export const ocrAction: ActionDefinition<OcrInput, OcrOutput> = {
     type: "object",
     additionalProperties: false,
     properties: {
+      ...llmSelectionConfigSchema,
       mock: {
         type: "object",
         nullable: true,
@@ -202,12 +198,8 @@ export const ocrAction: ActionDefinition<OcrInput, OcrOutput> = {
       },
     },
   },
-  async run(input, _context, config) {
-    const mock = readMockConfig(config);
-    const text = typeof mock?.response === "string"
-      ? mock.response
-      : renderOcrPreview(input.image);
-    return { text };
+  async run(input, context, config) {
+    return await context.llm.run<OcrOutput>("llm.ocr", input, config);
   },
 };
 
@@ -323,17 +315,4 @@ function normalizeImageArtifact(value: unknown, fallback: ImageArtifact): ImageA
     typeof candidate.width === "number" ? candidate.width : fallback.width,
     typeof candidate.height === "number" ? candidate.height : fallback.height,
   );
-}
-
-function renderVisionPreview(image: ImageArtifact, prompt?: string): string {
-  const imageName = basename(image.path);
-  const size = typeof image.width === "number" && typeof image.height === "number" ? " " + image.width + "x" + image.height : "";
-  const promptText = typeof prompt === "string" && prompt.trim().length > 0 ? " Prompt: " + prompt.trim() : "";
-  return "Image analysis preview for " + imageName + " (" + image.mimeType + size + ")." + promptText;
-}
-
-function renderOcrPreview(image: ImageArtifact): string {
-  const imageName = basename(image.path);
-  const size = typeof image.width === "number" && typeof image.height === "number" ? " " + image.width + "x" + image.height : "";
-  return "OCR preview for " + imageName + " (" + image.mimeType + size + ").";
 }
