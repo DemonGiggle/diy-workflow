@@ -4,7 +4,7 @@ Emits text or JSON-compatible content to the workflow run output surface.
 
 ## Capability
 
-`io.write_stdout` is a lightweight sink for final or intermediate textual output. CLI runs write the emitted text directly to stdout, while saved traces keep the rendered content, label, newline flag, and byte count so the visual editor can reconstruct the same run output in its Output panel.
+`io.write_stdout` is a lightweight sink for final or intermediate textual output. CLI runs write the emitted text directly to stdout, while saved traces keep the rendered content, label, newline flag, and byte count on the step output and also record a matching run log event with `category: "stdout"`.
 
 ## Input
 

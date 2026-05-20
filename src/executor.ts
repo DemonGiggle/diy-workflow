@@ -1,11 +1,12 @@
 import { Ajv } from "ajv";
 import { dirname, resolve } from "node:path";
-import type { ActionContext, JsonObject, RunTrace, StepTrace, WorkflowDocument } from "./types.js";
+import type { ActionContext, JsonObject, RunLogEvent, RunTrace, StepTrace, WorkflowDocument } from "./types.js";
 import type { ActionRegistry } from "./registry.js";
 import { createLlmRuntime } from "./llmRuntime.js";
 import { resolveReferences, type StepOutputRecord } from "./references.js";
 import { TraceStore } from "./trace.js";
 import type { StdoutEmission } from "./types.js";
+import { stdoutEmissionToLogEvent } from "./stdout.js";
 import { WorkflowValidator } from "./validator.js";
 
 export interface ExecuteOptions {
@@ -14,6 +15,7 @@ export interface ExecuteOptions {
   registry: ActionRegistry;
   traceStore?: TraceStore;
   stdoutWriter?: (output: StdoutEmission) => Promise<void> | void;
+  logWriter?: (event: RunLogEvent) => Promise<void> | void;
 }
 
 export class WorkflowExecutor {
@@ -31,7 +33,20 @@ export class WorkflowExecutor {
     const startedAt = new Date().toISOString();
     const stepOutputs = new Map<string, StepOutputRecord>();
     const steps: StepTrace[] = [];
+    const logs: RunLogEvent[] = [];
     const cwd = dirname(resolve(options.workflowPath));
+    let nextLogIndex = 0;
+
+    const appendLog = async (event: Omit<RunLogEvent, "index" | "timestamp">) => {
+      const entry: RunLogEvent = {
+        ...event,
+        index: nextLogIndex,
+        timestamp: new Date().toISOString(),
+      };
+      nextLogIndex += 1;
+      logs.push(entry);
+      await options.logWriter?.(entry);
+    };
 
     let status: "success" | "failed" = "success";
     for (const step of options.workflow.steps) {
@@ -67,6 +82,7 @@ export class WorkflowExecutor {
             metadata = { ...metadata, ...patch };
           },
           emitStdout: async (output) => {
+            await appendLog(stdoutEmissionToLogEvent(step.id, output));
             await options.stdoutWriter?.(output);
           },
           runAction: async (type: string, input: unknown, config?: JsonObject) => {
@@ -114,6 +130,7 @@ export class WorkflowExecutor {
       status,
       startedAt,
       endedAt: new Date().toISOString(),
+      logs,
       steps,
     };
     await traceStore.save(trace);

@@ -198,6 +198,7 @@ test("CLI prints stdout action output during workflow runs", async () => {
     const show = await runCli(["runs", "show", "run_0001"], dir);
     assert.equal(show.code, 0);
     const trace = JSON.parse(show.stdout) as {
+      logs?: Array<{ index: number; timestamp: string; level: string; stepId: string; category?: string; message?: string; label?: string; newline?: boolean; bytes?: number }>;
       steps: Array<{ id: string; type: string; output: { content?: string; label?: string; newline?: boolean; bytes?: number } }>;
     };
     assert.equal(trace.steps[1]?.id, "emit");
@@ -208,6 +209,16 @@ test("CLI prints stdout action output during workflow runs", async () => {
       newline: true,
       bytes: Buffer.byteLength("result: world\n", "utf8"),
     });
+    assert.deepEqual(trace.logs, [
+      {
+        stepId: "emit",
+        category: "stdout",
+        message: "world",
+        label: "result",
+        newline: true,
+        bytes: Buffer.byteLength("result: world\n", "utf8"),
+      },
+    ].map((entry, index) => ({ ...entry, index, level: "info", timestamp: trace.logs?.[index]?.timestamp })));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

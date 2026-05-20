@@ -161,4 +161,14 @@ Each step trace contains:
 - error
 - metrics
 
-For `io.write_stdout`, the saved step output includes the rendered content, label, newline flag, and byte count so CLI output and the editor's Output panel stay inspectable after the run.
+Each run trace can also contain an ordered `logs` array for replayable run events. The initial log model persists:
+
+- `index`
+- `timestamp`
+- `level`
+- `stepId`
+- `message`
+- optional `label` / `category`
+- optional compatibility fields such as `newline` / `bytes`
+
+For `io.write_stdout`, the saved step output still includes the rendered content, label, newline flag, and byte count, and the executor also records a corresponding `logs[]` entry with `category: "stdout"` so CLI and UI viewers can migrate toward a shared log stream.

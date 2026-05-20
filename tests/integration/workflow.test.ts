@@ -211,7 +211,57 @@ test("executor runs workflow, resolves references, and saves trace", async () =>
     });
     assert.equal(trace.status, "success");
     assert.equal(trace.steps.length, 3);
+    assert.deepEqual(trace.logs, []);
     assert.deepEqual(trace.steps[2]?.output, { matched: true, actual: "One. Two.", expected: "One. Two." });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("executor persists ordered run log events for stdout actions", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-logs-"));
+  try {
+    const workflow: WorkflowDocument = {
+      name: "stdout-logs",
+      steps: [
+        { id: "emit_first", type: "io.write_stdout", input: { label: "first", content: "Hello" } },
+        { id: "emit_second", type: "io.write_stdout", input: { content: ["Second", "Third"], newline: false } },
+      ],
+    };
+
+    const traceStore = new TraceStore(join(dir, "runs"));
+    const trace = await new WorkflowExecutor().execute({
+      workflowPath: join(dir, "workflow.yaml"),
+      workflow,
+      registry: createDefaultRegistry(),
+      traceStore,
+    });
+    const saved = await traceStore.read(trace.runId);
+
+    assert.deepEqual(trace.logs, [
+      {
+        index: 0,
+        timestamp: trace.logs?.[0]?.timestamp,
+        level: "info",
+        stepId: "emit_first",
+        message: "Hello",
+        label: "first",
+        category: "stdout",
+        newline: true,
+        bytes: Buffer.byteLength("first: Hello\n", "utf8"),
+      },
+      {
+        index: 1,
+        timestamp: trace.logs?.[1]?.timestamp,
+        level: "info",
+        stepId: "emit_second",
+        message: '[\n  "Second",\n  "Third"\n]',
+        category: "stdout",
+        newline: false,
+        bytes: Buffer.byteLength('[\n  "Second",\n  "Third"\n]', "utf8"),
+      },
+    ]);
+    assert.deepEqual(saved.logs, trace.logs);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
