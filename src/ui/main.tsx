@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Cable, CirclePlay, Copy, Download, FileCode2, FolderOpen, Grip, Plus, Save, Settings2, Trash2 } from "lucide-react";
+import { Cable, CheckCircle2, CirclePlay, Copy, Download, FileCode2, FolderOpen, Grip, MoreHorizontal, Plus, Save, Settings2, Trash2 } from "lucide-react";
 import YAML from "yaml";
 import type { LlmProviderKind, RunTrace, WorkflowStep } from "../types.js";
 import { isLlmActionType, listSelectableModels } from "../providers.js";
@@ -36,6 +36,7 @@ import {
 import { listRuns, runWorkflow, showRun, validateWorkflow } from "./apiClient.js";
 import type { OutputDescriptor } from "./actionCatalog.js";
 import { createTranslator, isLocale, localeOptions, localizeAction, localizeActions, type Locale } from "./i18n.js";
+import { createTopbarLayout, type TopbarActionId } from "./topbar.js";
 import { formatValidationIssues, parseWorkflowYaml, suggestWorkflowFileName } from "./workflowFiles.js";
 import { calculateDraggedNodePosition, calculateNodeDragOffset, type Point } from "./drag.js";
 import "./styles.css";
@@ -66,6 +67,7 @@ function App() {
   const yaml = useMemo(() => YAML.stringify(state.workflow), [state.workflow]);
   const saveUsesFileSystemApi = workflowFileHandle !== null || supportsSavePicker();
   const saveActionLabel = saveUsesFileSystemApi ? t("yaml.saveAction") : t("yaml.downloadAction");
+  const topbarLayout = useMemo(() => createTopbarLayout({ saveUsesFileSystemApi, hasRuns: runs.length > 0 }), [saveUsesFileSystemApi, runs.length]);
 
   useEffect(() => {
     window.localStorage?.setItem(localeStorageKey, locale);
@@ -183,28 +185,146 @@ function App() {
     }
   }
 
+  async function copyWorkflowYaml() {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(yaml);
+      setStatusMessage(t("yaml.copied"));
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function validateCurrentWorkflow() {
+    setStatusMessage(t("run.validatingWorkflow"));
+    try {
+      const validation = await validateWorkflow(state.workflow);
+      setStatusMessage(validation.ok ? t("run.validationPassed") : formatValidationIssues(validation.issues));
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleTopbarAction(actionId: TopbarActionId, trigger: HTMLElement) {
+    closeTopbarMenu(trigger);
+
+    switch (actionId) {
+      case "open-workflow":
+        await openWorkflowYaml();
+        break;
+      case "save-workflow":
+        await saveWorkflowYaml();
+        break;
+      case "copy-yaml":
+        await copyWorkflowYaml();
+        break;
+      case "validate-workflow":
+        await validateCurrentWorkflow();
+        break;
+      case "run-workflow":
+        await executeWorkflow();
+        break;
+      case "show-latest-run":
+        if (runs[0]) await inspectRun(runs[0]);
+        break;
+      case "refresh-runs":
+        await refreshRuns(setRuns, setStatusMessage, t);
+        break;
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div>
-          <h1>diy-workflow</h1>
-          <span>{t("app.subtitle")}</span>
+        <div className="topbar-brand">
+          <div>
+            <h1>diy-workflow</h1>
+            <span>{t("app.subtitle")}</span>
+          </div>
+          <div className="topbar-context">
+            <span className="topbar-chip">
+              <strong>{t("topbar.currentFile")}</strong>
+              {workflowFileName ?? t("topbar.unsavedWorkflow")}
+            </span>
+            <span className={`topbar-chip topbar-status ${isRunning ? "is-running" : ""}`}>{statusMessage}</span>
+          </div>
         </div>
         <div className="topbar-actions">
-          <div className="view-switch" role="tablist" aria-label="Editor view">
-            <button className={view === "workflow" ? "secondary active-tab" : "secondary"} onClick={() => setView("workflow")}>{t("view.workflow")}</button>
-            <button className={view === "providers" ? "secondary active-tab" : "secondary"} onClick={() => setView("providers")}>{t("view.providers")}</button>
-          </div>
-          <label className="locale-picker">
-            <span>{t("locale.label")}</span>
-            <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-              {localeOptions.map((option) => <option key={option.locale} value={option.locale}>{option.label}</option>)}
-            </select>
-          </label>
-          <button className="secondary" onClick={openWorkflowYaml}><FolderOpen size={16}/> {t("yaml.loadAction")}</button>
-          <button className="secondary" onClick={saveWorkflowYaml}>{saveUsesFileSystemApi ? <Save size={16}/> : <Download size={16}/>} {saveActionLabel}</button>
-          <button className="secondary" onClick={() => navigator.clipboard?.writeText(yaml)}><Copy size={16}/> {t("run.copyYaml")}</button>
-          <button onClick={executeWorkflow} disabled={isRunning}><CirclePlay size={16}/> {isRunning ? t("run.running") : t("run.runWorkflow")}</button>
+          <section className="topbar-group">
+            <span className="topbar-group-label">{t("topbar.viewGroup")}</span>
+            <div className="view-switch" role="tablist" aria-label="Editor view">
+              <button className={view === "workflow" ? "secondary active-tab" : "secondary"} onClick={() => setView("workflow")}>{t("view.workflow")}</button>
+              <button className={view === "providers" ? "secondary active-tab" : "secondary"} onClick={() => setView("providers")}>{t("view.providers")}</button>
+            </div>
+          </section>
+
+          <details className="topbar-menu">
+            <summary className="secondary">
+              <FolderOpen size={16}/>
+              {t("topbar.workflowGroup")}
+            </summary>
+            <div className="topbar-menu-panel" role="menu" aria-label={t("topbar.workflowGroup")}>
+              {topbarLayout.workflowMenuActions.map((action) => (
+                <button
+                  key={action.id}
+                  className="secondary topbar-menu-item"
+                  onClick={(event) => void handleTopbarAction(action.id, event.currentTarget)}
+                >
+                  {iconForTopbarAction(action.id, saveUsesFileSystemApi)}
+                  {action.id === "save-workflow" ? saveActionLabel : t(action.labelKey)}
+                </button>
+              ))}
+            </div>
+          </details>
+
+          <section className="topbar-group topbar-run-group">
+            <span className="topbar-group-label">{t("topbar.runGroup")}</span>
+            <div className="topbar-button-row">
+              {topbarLayout.runActions.map((action) => (
+                <button
+                  key={action.id}
+                  className={action.emphasis === "primary" ? undefined : "secondary"}
+                  disabled={isRunning && action.id !== "validate-workflow"}
+                  onClick={(event) => void handleTopbarAction(action.id, event.currentTarget)}
+                >
+                  {iconForTopbarAction(action.id, saveUsesFileSystemApi)}
+                  {action.id === "run-workflow" && isRunning ? t("run.running") : t(action.labelKey)}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <details className="topbar-menu">
+            <summary className="secondary">
+              <MoreHorizontal size={16}/>
+              {t("topbar.moreGroup")}
+            </summary>
+            <div className="topbar-menu-panel topbar-menu-panel-wide" role="menu" aria-label={t("topbar.moreGroup")}>
+              <label className="topbar-menu-field">
+                <span>{t("locale.label")}</span>
+                <select
+                  value={locale}
+                  onChange={(event) => {
+                    setLocale(event.target.value as Locale);
+                    closeTopbarMenu(event.currentTarget);
+                  }}
+                >
+                  {localeOptions.map((option) => <option key={option.locale} value={option.locale}>{option.label}</option>)}
+                </select>
+              </label>
+              <div className="topbar-menu-divider" />
+              {topbarLayout.moreMenuActions.map((action) => (
+                <button
+                  key={action.id}
+                  className="secondary topbar-menu-item"
+                  onClick={(event) => void handleTopbarAction(action.id, event.currentTarget)}
+                >
+                  {iconForTopbarAction(action.id, saveUsesFileSystemApi)}
+                  {t(action.labelKey)}
+                </button>
+              ))}
+            </div>
+          </details>
         </div>
       </header>
       <input ref={fileInputRef} type="file" accept=".yaml,.yml" hidden onChange={handleFileInputChange} />
@@ -238,6 +358,29 @@ type Translator = ReturnType<typeof createTranslator>;
 function readStoredLocale(): Locale {
   const value = window.localStorage?.getItem(localeStorageKey);
   return value && isLocale(value) ? value : "en";
+}
+
+function closeTopbarMenu(target: HTMLElement | null) {
+  const details = target?.closest("details");
+  if (details instanceof HTMLDetailsElement) details.open = false;
+}
+
+function iconForTopbarAction(actionId: TopbarActionId, saveUsesFileSystemApi: boolean): React.ReactNode {
+  switch (actionId) {
+    case "open-workflow":
+      return <FolderOpen size={16}/>;
+    case "save-workflow":
+      return saveUsesFileSystemApi ? <Save size={16}/> : <Download size={16}/>;
+    case "copy-yaml":
+      return <Copy size={16}/>;
+    case "validate-workflow":
+      return <CheckCircle2 size={16}/>;
+    case "run-workflow":
+      return <CirclePlay size={16}/>;
+    case "show-latest-run":
+    case "refresh-runs":
+      return <Cable size={16}/>;
+  }
 }
 
 async function refreshRuns(setRuns: (runs: string[]) => void, setStatusMessage: (message: string) => void, t: Translator, reportSuccess = true): Promise<void> {
