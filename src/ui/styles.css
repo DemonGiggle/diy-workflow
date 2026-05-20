@@ -47,10 +47,21 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
 .action-card span { display: block; margin-top: 2px; color: #576174; font-size: 12px; }
 .action-card p { margin: 8px 0 0; color: #4b5565; font-size: 12px; line-height: 1.35; }
 .canvas { position: relative; overflow: auto; min-height: calc(100vh - 68px); background: #f7f9fc; }
-.canvas-grid { position: absolute; inset: 0; min-width: 1500px; min-height: 950px; background-image: linear-gradient(#e8edf4 1px, transparent 1px), linear-gradient(90deg, #e8edf4 1px, transparent 1px); background-size: 24px 24px; }
-.connections { position: absolute; inset: 0; width: 1500px; height: 950px; pointer-events: none; }
+.canvas-toolbar { position: sticky; top: 12px; left: 12px; z-index: 3; display: inline-flex; gap: 6px; padding: 6px; margin: 12px; border: 1px solid #d9dee7; border-radius: 10px; background: rgba(255, 255, 255, 0.92); box-shadow: 0 12px 24px rgba(28, 39, 59, 0.12); backdrop-filter: blur(10px); }
+.canvas-zoom-pill { min-width: 72px; justify-content: center; font-variant-numeric: tabular-nums; }
+.canvas-space { position: relative; min-width: 100%; min-height: 100%; }
+.canvas-viewport { position: absolute; inset: 0 auto auto 0; transform-origin: top left; }
+.canvas-grid { position: absolute; inset: 0; background-image: linear-gradient(#e8edf4 1px, transparent 1px), linear-gradient(90deg, #e8edf4 1px, transparent 1px); background-size: 24px 24px; }
+.connections { position: absolute; inset: 0; pointer-events: none; }
 .connections path { fill: none; stroke: #7c8da6; stroke-width: 2; }
 .connections circle { fill: #17a06b; stroke: #ffffff; stroke-width: 1.5; }
+.minimap { position: sticky; right: 12px; bottom: 12px; margin: calc(100vh - 240px) 12px 12px auto; z-index: 3; width: 204px; padding: 10px; border: 1px solid #d9dee7; border-radius: 12px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 16px 30px rgba(28, 39, 59, 0.14); backdrop-filter: blur(10px); }
+.minimap-header { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; color: #4b5565; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.minimap-surface { position: relative; width: 180px; height: 116px; border-radius: 8px; background: linear-gradient(180deg, #eef4ff 0%, #f6f8fb 100%); overflow: hidden; }
+.minimap-canvas { position: absolute; }
+.minimap-node { position: absolute; border-radius: 4px; background: rgba(31, 111, 235, 0.16); border: 1px solid rgba(31, 111, 235, 0.38); }
+.minimap-node.selected { background: rgba(23, 160, 107, 0.18); border-color: rgba(23, 160, 107, 0.5); }
+.minimap-viewport { position: absolute; border: 2px solid #1554b5; border-radius: 6px; background: rgba(21, 84, 181, 0.12); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5); }
 .provider-settings { min-height: calc(100vh - 68px); overflow: auto; padding: 18px; background: #f7f9fc; }
 .provider-list { display: grid; gap: 14px; margin-bottom: 14px; }
 .provider-card, .model-card { background: #fff; border: 1px solid #dce3ec; border-radius: 8px; padding: 14px; }
@@ -126,6 +137,8 @@ textarea { min-height: 82px; resize: vertical; line-height: 1.4; }
   .workspace { display: flex; flex-direction: column; }
   .palette, .side-panel { min-height: auto; border: 0; border-bottom: 1px solid #d9dee7; }
   .canvas { min-height: 470px; border-bottom: 1px solid #d9dee7; }
+  .canvas-toolbar { position: absolute; }
+  .minimap { position: absolute; margin: 0; width: 184px; right: 12px; bottom: 12px; }
 }
 
 @media (max-width: 480px) {

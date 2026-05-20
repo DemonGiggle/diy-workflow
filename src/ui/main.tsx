@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Cable, CheckCircle2, CirclePlay, Copy, Download, FileCode2, FolderOpen, Grip, MoreHorizontal, Plus, Save, Settings2, Trash2 } from "lucide-react";
+import { Cable, CheckCircle2, CirclePlay, Copy, Download, FileCode2, FolderOpen, Grip, LocateFixed, Minus, MoreHorizontal, Plus, Save, Settings2, Trash2 } from "lucide-react";
 import YAML from "yaml";
 import type { LlmProviderKind, RunTrace, WorkflowStep } from "../types.js";
 import { isLlmActionType, listSelectableModels } from "../providers.js";
@@ -39,7 +39,19 @@ import { createTranslator, isLocale, localeOptions, localizeAction, localizeActi
 import { createTopbarLayout, type TopbarActionId } from "./topbar.js";
 import { listStdoutEntries } from "./runOutput.js";
 import { formatValidationIssues, parseWorkflowYaml, suggestWorkflowFileName } from "./workflowFiles.js";
-import { calculateDraggedNodePosition, calculateNodeDragOffset, type Point } from "./drag.js";
+import {
+  calculateDraggedNodePosition,
+  calculateNodeDragOffset,
+  calculateScrollForViewportCenter,
+  calculateScrollForViewportTopLeft,
+  calculateViewportFrame,
+  clampZoom,
+  deriveCanvasBounds,
+  type CanvasViewport,
+  type Point,
+  type Size,
+  type ViewportFrame,
+} from "./drag.js";
 import "./styles.css";
 
 const localeStorageKey = "diy-workflow.locale";
@@ -431,91 +443,192 @@ function groupActionsByNamespace(actions: EditorActionDefinition[]): Map<string,
 
 function Canvas({ state, locale, t, setState }: { state: EditorState; locale: Locale; t: Translator; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
   const canvasRef = useRef<HTMLElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const [viewport, setViewport] = useState<CanvasViewport>({ scrollLeft: 0, scrollTop: 0, clientWidth: 0, clientHeight: 0 });
   const [dragging, setDragging] = useState<{ stepId: string; offset: Point } | null>(null);
   const [linking, setLinking] = useState<{ stepId: string; field: OutputDescriptor } | null>(null);
+  const [minimapDrag, setMinimapDrag] = useState<{ offset: Point } | null>(null);
+  const bounds = useMemo(() => deriveCanvasBounds(state.positions), [state.positions]);
+  const viewportFrame = useMemo(() => calculateViewportFrame(viewport, zoom, bounds), [bounds, viewport, zoom]);
+
+  useEffect(() => {
+    const element = canvasRef.current;
+    if (!element) return;
+
+    const updateViewport = () => {
+      setViewport({
+        scrollLeft: element.scrollLeft,
+        scrollTop: element.scrollTop,
+        clientWidth: element.clientWidth,
+        clientHeight: element.clientHeight,
+      });
+    };
+
+    updateViewport();
+    element.addEventListener("scroll", updateViewport, { passive: true });
+    const resizeObserver = new ResizeObserver(updateViewport);
+    resizeObserver.observe(element);
+    return () => {
+      element.removeEventListener("scroll", updateViewport);
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (!dragging) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const position = calculateDraggedNodePosition({ x: event.clientX, y: event.clientY }, rect, dragging.offset);
+    const currentViewport = readViewport(event.currentTarget);
+    const position = calculateDraggedNodePosition({ x: event.clientX, y: event.clientY }, rect, currentViewport, dragging.offset, zoom);
     setState((current) => moveStep(current, dragging.stepId, position));
   }
 
+  function changeZoom(nextZoom: number) {
+    const element = canvasRef.current;
+    const clampedZoom = clampZoom(nextZoom);
+    if (!element) {
+      setZoom(clampedZoom);
+      return;
+    }
+
+    const center = {
+      x: viewportFrame.left + viewportFrame.width / 2,
+      y: viewportFrame.top + viewportFrame.height / 2,
+    };
+    setZoom(clampedZoom);
+    requestAnimationFrame(() => {
+      const scroll = calculateScrollForViewportCenter(center, {
+        width: element.clientWidth,
+        height: element.clientHeight,
+      }, bounds, clampedZoom);
+      element.scrollTo({ left: scroll.x, top: scroll.y });
+    });
+  }
+
+  function moveViewport(topLeft: Point) {
+    const element = canvasRef.current;
+    if (!element) return;
+    const scroll = calculateScrollForViewportTopLeft(topLeft, {
+      width: element.clientWidth,
+      height: element.clientHeight,
+    }, bounds, zoom);
+    element.scrollTo({ left: scroll.x, top: scroll.y });
+  }
+
   return (
-    <section ref={canvasRef} className="canvas" onPointerMove={onPointerMove} onPointerUp={() => { setDragging(null); setLinking(null); }} onPointerLeave={() => setDragging(null)}>
-      <div className="canvas-grid" />
-      <Connections state={state} />
-      {state.workflow.steps.map((step, index) => {
-        const action = getEditorAction(step.type);
-        const localizedAction = action ? localizeAction(action, locale) : undefined;
-        const pos = state.positions[step.id] ?? { x: 80 + index * 300, y: 96 };
-        return (
-          <article
-            key={step.id}
-            className={`node ${state.selectedStepId === step.id ? "selected" : ""}`}
-            style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
-            onClick={() => setState((current) => ({ ...current, selectedStepId: step.id }))}
-          >
-            <button
-              className="drag-handle"
-              onPointerDown={(event) => {
-                const canvasRect = canvasRef.current?.getBoundingClientRect();
-                if (!canvasRect) return;
-                event.currentTarget.setPointerCapture(event.pointerId);
-                const offset = calculateNodeDragOffset({ x: event.clientX, y: event.clientY }, canvasRect, pos);
-                setDragging({ stepId: step.id, offset });
-              }}
-              title={t("editor.dragNode")}
-            >
-              <Grip size={15}/>
-            </button>
-            <div className="node-index">{index + 1}</div>
-            <h3>{localizedAction?.label ?? step.type}</h3>
-            <code>{step.id}</code>
-            <div className="node-io">
-              <div>
-                <span>{t("common.input")}</span>
-                {(localizedAction?.inputFields ?? []).map((field) => {
-                  const connectable = linking && field.connectable;
-                  const compatible = connectable ? field.connectable && isLinkCompatible(linking.field, field) : false;
-                  return (
-                    <code
-                      key={field.name}
-                      className={`port input-port ${connectable ? compatible ? "drop-ok" : "drop-blocked" : ""}`}
-                      title={field.connectable ? t("editor.connectOutput") : t("editor.notConnectable")}
-                      onPointerUp={(event) => {
-                        if (!linking) return;
-                        event.stopPropagation();
-                        const result = connectCompatibleField(state, step.id, field.name, linking.stepId, linking.field.name);
-                        if (result.ok) setState(result.state);
-                        setLinking(null);
-                      }}
-                    >
-                      {field.name}
-                    </code>
-                  );
-                })}
-              </div>
-              <div>
-                <span>{t("common.output")}</span>
-                {(localizedAction?.outputFields ?? []).map((field) => (
-                  <code
-                    key={field.name}
-                    className={`port output-port ${linking?.stepId === step.id && linking.field.name === field.name ? "linking" : ""}`}
-                    title={t("editor.connectOutput")}
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                      setLinking({ stepId: step.id, field });
-                    }}
-                  >
-                    {field.name}
-                  </code>
-                ))}
-              </div>
-            </div>
-          </article>
-        );
-      })}
+    <section
+      ref={canvasRef}
+      className="canvas"
+      onPointerMove={onPointerMove}
+      onPointerUp={() => { setDragging(null); setLinking(null); }}
+      onPointerLeave={() => setDragging(null)}
+    >
+      <div className="canvas-toolbar">
+        <button className="secondary" onClick={() => changeZoom(zoom - 0.1)} title={t("canvas.zoomOut")} aria-label={t("canvas.zoomOut")}>
+          <Minus size={15}/>
+        </button>
+        <button className="secondary canvas-zoom-pill" onClick={() => changeZoom(1)} title={t("canvas.zoomReset")} aria-label={t("canvas.zoomReset")}>
+          {Math.round(zoom * 100)}%
+        </button>
+        <button className="secondary" onClick={() => changeZoom(zoom + 0.1)} title={t("canvas.zoomIn")} aria-label={t("canvas.zoomIn")}>
+          <Plus size={15}/>
+        </button>
+      </div>
+
+      <div className="canvas-space" style={{ width: `${bounds.width * zoom}px`, height: `${bounds.height * zoom}px` }}>
+        <div className="canvas-viewport" style={{ width: `${bounds.width}px`, height: `${bounds.height}px`, transform: `scale(${zoom})` }}>
+          <div className="canvas-grid" style={{ width: `${bounds.width}px`, height: `${bounds.height}px` }} />
+          <Connections state={state} bounds={bounds} />
+          {state.workflow.steps.map((step, index) => {
+            const action = getEditorAction(step.type);
+            const localizedAction = action ? localizeAction(action, locale) : undefined;
+            const pos = state.positions[step.id] ?? { x: 80 + index * 300, y: 96 };
+            return (
+              <article
+                key={step.id}
+                className={`node ${state.selectedStepId === step.id ? "selected" : ""}`}
+                style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
+                onClick={() => setState((current) => ({ ...current, selectedStepId: step.id }))}
+              >
+                <button
+                  className="drag-handle"
+                  onPointerDown={(event) => {
+                    const canvasElement = canvasRef.current;
+                    const canvasRect = canvasElement?.getBoundingClientRect();
+                    if (!canvasElement || !canvasRect) return;
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    const offset = calculateNodeDragOffset(
+                      { x: event.clientX, y: event.clientY },
+                      canvasRect,
+                      readViewport(canvasElement),
+                      pos,
+                      zoom,
+                    );
+                    setDragging({ stepId: step.id, offset });
+                  }}
+                  title={t("editor.dragNode")}
+                >
+                  <Grip size={15}/>
+                </button>
+                <div className="node-index">{index + 1}</div>
+                <h3>{localizedAction?.label ?? step.type}</h3>
+                <code>{step.id}</code>
+                <div className="node-io">
+                  <div>
+                    <span>{t("common.input")}</span>
+                    {(localizedAction?.inputFields ?? []).map((field) => {
+                      const connectable = linking && field.connectable;
+                      const compatible = connectable ? field.connectable && isLinkCompatible(linking.field, field) : false;
+                      return (
+                        <code
+                          key={field.name}
+                          className={`port input-port ${connectable ? compatible ? "drop-ok" : "drop-blocked" : ""}`}
+                          title={field.connectable ? t("editor.connectOutput") : t("editor.notConnectable")}
+                          onPointerUp={(event) => {
+                            if (!linking) return;
+                            event.stopPropagation();
+                            const result = connectCompatibleField(state, step.id, field.name, linking.stepId, linking.field.name);
+                            if (result.ok) setState(result.state);
+                            setLinking(null);
+                          }}
+                        >
+                          {field.name}
+                        </code>
+                      );
+                    })}
+                  </div>
+                  <div>
+                    <span>{t("common.output")}</span>
+                    {(localizedAction?.outputFields ?? []).map((field) => (
+                      <code
+                        key={field.name}
+                        className={`port output-port ${linking?.stepId === step.id && linking.field.name === field.name ? "linking" : ""}`}
+                        title={t("editor.connectOutput")}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          setLinking({ stepId: step.id, field });
+                        }}
+                      >
+                        {field.name}
+                      </code>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+
+      <MiniMap
+        bounds={bounds}
+        state={state}
+        viewportFrame={viewportFrame}
+        locale={locale}
+        title={t("canvas.minimap")}
+        onMoveViewport={moveViewport}
+        onStartDrag={setMinimapDrag}
+        minimapDrag={minimapDrag}
+      />
     </section>
   );
 }
@@ -525,10 +638,10 @@ function isLinkCompatible(source: OutputDescriptor, target: FieldDescriptor): bo
   return isCompatibleConnection(source.kind, target.kind);
 }
 
-function Connections({ state }: { state: EditorState }) {
+function Connections({ state, bounds }: { state: EditorState; bounds: Size }) {
   const lines = getWorkflowConnections(state);
   return (
-    <svg className="connections">
+    <svg className="connections" viewBox={`0 0 ${bounds.width} ${bounds.height}`} preserveAspectRatio="none" style={{ width: `${bounds.width}px`, height: `${bounds.height}px` }}>
       {lines.map((line, index) => {
         const from = portPosition(state, line.fromStepId, line.fromField, "output");
         const to = portPosition(state, line.toStepId, line.toField, "input");
@@ -541,6 +654,104 @@ function Connections({ state }: { state: EditorState }) {
         );
       })}
     </svg>
+  );
+}
+
+function MiniMap({
+  bounds,
+  state,
+  viewportFrame,
+  locale,
+  title,
+  onMoveViewport,
+  onStartDrag,
+  minimapDrag,
+}: {
+  bounds: Size;
+  state: EditorState;
+  viewportFrame: ViewportFrame;
+  locale: Locale;
+  title: string;
+  onMoveViewport: (topLeft: Point) => void;
+  onStartDrag: React.Dispatch<React.SetStateAction<{ offset: Point } | null>>;
+  minimapDrag: { offset: Point } | null;
+}) {
+  const scale = Math.min(180 / bounds.width, 116 / bounds.height);
+  const width = bounds.width * scale;
+  const height = bounds.height * scale;
+  const offsetX = (180 - width) / 2;
+  const offsetY = (116 - height) / 2;
+  const frameStyle = {
+    left: `${offsetX + viewportFrame.left * scale}px`,
+    top: `${offsetY + viewportFrame.top * scale}px`,
+    width: `${Math.max(18, viewportFrame.width * scale)}px`,
+    height: `${Math.max(14, viewportFrame.height * scale)}px`,
+  };
+
+  function modelPointFromClient(clientX: number, clientY: number, rect: DOMRect): Point {
+    return {
+      x: clampModel((clientX - rect.left - offsetX) / scale, bounds.width),
+      y: clampModel((clientY - rect.top - offsetY) / scale, bounds.height),
+    };
+  }
+
+  function pointInViewport(modelPoint: Point): boolean {
+    return modelPoint.x >= viewportFrame.left
+      && modelPoint.x <= viewportFrame.left + viewportFrame.width
+      && modelPoint.y >= viewportFrame.top
+      && modelPoint.y <= viewportFrame.top + viewportFrame.height;
+  }
+
+  return (
+    <section
+      className="minimap"
+      onPointerDown={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const modelPoint = modelPointFromClient(event.clientX, event.clientY, rect);
+        event.currentTarget.setPointerCapture(event.pointerId);
+        if (pointInViewport(modelPoint)) {
+          onStartDrag({ offset: { x: modelPoint.x - viewportFrame.left, y: modelPoint.y - viewportFrame.top } });
+        } else {
+          onMoveViewport({ x: modelPoint.x - viewportFrame.width / 2, y: modelPoint.y - viewportFrame.height / 2 });
+        }
+      }}
+      onPointerMove={(event) => {
+        if (!minimapDrag) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const modelPoint = modelPointFromClient(event.clientX, event.clientY, rect);
+        onMoveViewport({ x: modelPoint.x - minimapDrag.offset.x, y: modelPoint.y - minimapDrag.offset.y });
+      }}
+      onPointerUp={() => onStartDrag(null)}
+      onPointerLeave={() => onStartDrag(null)}
+    >
+      <header className="minimap-header">
+        <LocateFixed size={14}/>
+        <span>{title}</span>
+      </header>
+      <div className="minimap-surface">
+        <div className="minimap-canvas" style={{ width: `${width}px`, height: `${height}px`, left: `${offsetX}px`, top: `${offsetY}px` }}>
+          {state.workflow.steps.map((step, index) => {
+            const action = getEditorAction(step.type);
+            const label = action ? localizeAction(action, locale).label : step.type;
+            const pos = state.positions[step.id] ?? { x: 80 + index * 300, y: 96 };
+            return (
+              <div
+                key={step.id}
+                className={`minimap-node ${state.selectedStepId === step.id ? "selected" : ""}`}
+                title={label}
+                style={{
+                  left: `${pos.x * scale}px`,
+                  top: `${pos.y * scale}px`,
+                  width: `${Math.max(10, 280 * scale)}px`,
+                  height: `${Math.max(8, 164 * scale)}px`,
+                }}
+              />
+            );
+          })}
+          <div className="minimap-viewport" style={frameStyle} />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -970,6 +1181,19 @@ function downloadWorkflowYaml(content: string, fileName: string): void {
   anchor.download = fileName;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function readViewport(element: HTMLElement): CanvasViewport {
+  return {
+    scrollLeft: element.scrollLeft,
+    scrollTop: element.scrollTop,
+    clientWidth: element.clientWidth,
+    clientHeight: element.clientHeight,
+  };
+}
+
+function clampModel(value: number, max: number): number {
+  return Math.min(Math.max(value, 0), max);
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

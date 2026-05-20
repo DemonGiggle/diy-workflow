@@ -17,6 +17,8 @@ The visual editor is the UI foundation for composing workflows from typed action
 - save back to the opened YAML file when supported by the browser
 - download YAML when native file-save access is unavailable
 - copy generated YAML
+- zoom the whole canvas without mutating stored node coordinates
+- inspect node layout and drag the visible viewport from a minimap
 
 The top navigation keeps the most common actions visible and grouped:
 
@@ -24,6 +26,12 @@ The top navigation keeps the most common actions visible and grouped:
 - run controls keep validate and run together
 - workflow file actions live in a dedicated workflow menu
 - lower-frequency controls such as locale and recent-run access live in a secondary menu
+
+Canvas navigation now treats zoom as a pure view transform:
+
+- node coordinates remain in stable model space
+- dragging and connection hit targets continue to resolve against model-space positions
+- the minimap derives from the same layout state instead of maintaining a second canvas model
 
 ## Typed Connections
 
