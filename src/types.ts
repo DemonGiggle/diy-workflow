@@ -66,6 +66,21 @@ export interface StdoutTraceOutput extends StdoutEmission {
   bytes: number;
 }
 
+export type LogLevel = "debug" | "info" | "warn" | "error";
+
+export interface RunLogEvent {
+  index: number;
+  timestamp: string;
+  level: LogLevel;
+  stepId: string;
+  message: string;
+  label?: string;
+  category?: string;
+  data?: unknown;
+  newline?: boolean;
+  bytes?: number;
+}
+
 export interface StepTraceMetadata {
   llm?: LlmExecutionMetadata;
 }
@@ -127,6 +142,7 @@ export interface RunTrace {
   status: StepStatus;
   startedAt: string;
   endedAt: string;
+  logs?: RunLogEvent[];
   steps: StepTrace[];
 }
 

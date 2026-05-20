@@ -10,6 +10,29 @@ test("run output helper lists stdout entries in trace order", () => {
     status: "success",
     startedAt: "2026-01-01T00:00:00.000Z",
     endedAt: "2026-01-01T00:00:01.000Z",
+    logs: [
+      {
+        index: 0,
+        timestamp: "2026-01-01T00:00:00.100Z",
+        level: "info",
+        stepId: "emit_first",
+        category: "stdout",
+        message: "Hello",
+        label: "first",
+        newline: true,
+        bytes: 13,
+      },
+      {
+        index: 1,
+        timestamp: "2026-01-01T00:00:00.150Z",
+        level: "info",
+        stepId: "emit_second",
+        category: "stdout",
+        message: "Second line\nThird line",
+        newline: false,
+        bytes: 22,
+      },
+    ],
     steps: [
       {
         id: "prompt",
@@ -44,6 +67,31 @@ test("run output helper lists stdout entries in trace order", () => {
   assert.deepEqual(listStdoutEntries(trace), [
     { stepId: "emit_first", content: "Hello", label: "first", newline: true, bytes: 13 },
     { stepId: "emit_second", content: "Second line\nThird line", newline: false, bytes: 22 },
+  ]);
+});
+
+test("run output helper falls back to legacy stdout step outputs when logs are absent", () => {
+  const trace: RunTrace = {
+    runId: "run_0003",
+    workflow: { name: "legacy-stdout", path: "/tmp/workflow.yaml" },
+    status: "success",
+    startedAt: "2026-01-01T00:00:00.000Z",
+    endedAt: "2026-01-01T00:00:01.000Z",
+    steps: [
+      {
+        id: "emit",
+        type: "io.write_stdout",
+        input: {},
+        output: { content: "Legacy", newline: true, bytes: 7 },
+        status: "success",
+        error: null,
+        metrics: { startedAt: "2026-01-01T00:00:00.100Z", endedAt: "2026-01-01T00:00:00.200Z", durationMs: 100 },
+      },
+    ],
+  };
+
+  assert.deepEqual(listStdoutEntries(trace), [
+    { stepId: "emit", content: "Legacy", newline: true, bytes: 7 },
   ]);
 });
 
