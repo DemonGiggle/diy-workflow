@@ -168,6 +168,51 @@ test("CLI runs image workflows with connected image artifacts", async () => {
   }
 });
 
+test("CLI prints stdout action output during workflow runs", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-stdout-cli-"));
+  try {
+    const workflowPath = join(dir, "workflow.yaml");
+    await writeFile(workflowPath, [
+      "name: stdout-cli-test",
+      "steps:",
+      "  - id: prompt",
+      "    type: llm.prompt",
+      "    input:",
+      "      prompt: hello",
+      "    config:",
+      "      mock:",
+      "        enabled: true",
+      "        response: world",
+      "  - id: emit",
+      "    type: io.write_stdout",
+      "    input:",
+      "      label: result",
+      "      content: \"{{steps.prompt.output.text}}\"",
+      "",
+    ].join("\n"), "utf8");
+
+    const run = await runCli(["run", workflowPath], dir);
+    assert.equal(run.code, 0);
+    assert.match(run.stdout, /^result: world\r?\nSUCCESS run_0001\r?\nTrace: runs\/run_0001\/trace\.json\r?\n?$/);
+
+    const show = await runCli(["runs", "show", "run_0001"], dir);
+    assert.equal(show.code, 0);
+    const trace = JSON.parse(show.stdout) as {
+      steps: Array<{ id: string; type: string; output: { content?: string; label?: string; newline?: boolean; bytes?: number } }>;
+    };
+    assert.equal(trace.steps[1]?.id, "emit");
+    assert.equal(trace.steps[1]?.type, "io.write_stdout");
+    assert.deepEqual(trace.steps[1]?.output, {
+      content: "world",
+      label: "result",
+      newline: true,
+      bytes: Buffer.byteLength("result: world\n", "utf8"),
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 function runCli(args: string[], cwd: string): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, [cliPath, ...args], { cwd, env: process.env });

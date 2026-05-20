@@ -75,6 +75,7 @@ node dist/cli.js serve --host 127.0.0.1 --port 4173
 - `io.read_file`
 - `io.read_image`
 - `io.write_file`
+- `io.write_stdout`
 - `io.write_image`
 - `llm.prompt`
 - `llm.vision_analyze`

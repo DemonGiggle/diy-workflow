@@ -4,6 +4,7 @@ import { createDefaultRegistry } from "./actions/index.js";
 import { WorkflowExecutor } from "./executor.js";
 import { loadWorkflow } from "./loader.js";
 import { createWorkflowServer } from "./server.js";
+import { formatStdoutEmission } from "./stdout.js";
 import { TraceStore } from "./trace.js";
 import { WorkflowValidator } from "./validator.js";
 
@@ -40,7 +41,19 @@ program
     await runCli(async () => {
       const registry = createDefaultRegistry();
       const workflow = await loadWorkflow(workflowPath);
-      const trace = await new WorkflowExecutor().execute({ workflowPath, workflow, registry });
+      const trace = await new WorkflowExecutor().execute({
+        workflowPath,
+        workflow,
+        registry,
+        stdoutWriter: async (output) => {
+          await new Promise<void>((resolvePromise, reject) => {
+            process.stdout.write(formatStdoutEmission(output), (error) => {
+              if (error) reject(error);
+              else resolvePromise();
+            });
+          });
+        },
+      });
       console.log(`${trace.status.toUpperCase()} ${trace.runId}`);
       console.log(`Trace: runs/${trace.runId}/trace.json`);
       if (trace.status !== "success") process.exitCode = 1;

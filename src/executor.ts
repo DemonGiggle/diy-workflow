@@ -5,6 +5,7 @@ import type { ActionRegistry } from "./registry.js";
 import { createLlmRuntime } from "./llmRuntime.js";
 import { resolveReferences, type StepOutputRecord } from "./references.js";
 import { TraceStore } from "./trace.js";
+import type { StdoutEmission } from "./types.js";
 import { WorkflowValidator } from "./validator.js";
 
 export interface ExecuteOptions {
@@ -12,6 +13,7 @@ export interface ExecuteOptions {
   workflow: WorkflowDocument;
   registry: ActionRegistry;
   traceStore?: TraceStore;
+  stdoutWriter?: (output: StdoutEmission) => Promise<void> | void;
 }
 
 export class WorkflowExecutor {
@@ -63,6 +65,9 @@ export class WorkflowExecutor {
           }),
           setTraceMetadata: (patch) => {
             metadata = { ...metadata, ...patch };
+          },
+          emitStdout: async (output) => {
+            await options.stdoutWriter?.(output);
           },
           runAction: async (type: string, input: unknown, config?: JsonObject) => {
             const nested = options.registry.get(type);

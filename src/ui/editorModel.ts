@@ -408,6 +408,7 @@ function mockOutputFor(step: WorkflowStep, index: number): unknown {
       const image = { path, mimeType: "image/png", bytes: 128, width: 1, height: 1 };
       return { ...image, image };
     }
+    case "io.write_stdout": return { content: "Preview stdout output", label: "preview", newline: true, bytes: 30 };
     case "llm.prompt": return { text: asObject(step.input).prompt || "Preview prompt response" };
     case "llm.vision_analyze": return { text: "Preview image analysis" };
     case "llm.ocr": return { text: "Preview OCR text" };

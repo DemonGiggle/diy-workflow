@@ -326,6 +326,53 @@ test("executor writes text and generated image outputs to disk", async () => {
   }
 });
 
+test("executor records stdout output and streams it through the runtime hook", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-stdout-output-"));
+  const emitted: Array<{ content: string; label?: string; newline: boolean }> = [];
+  try {
+    const workflow: WorkflowDocument = {
+      name: "stdout-output",
+      steps: [
+        {
+          id: "summarize",
+          type: "llm.summarize",
+          input: { text: "One sentence. Two sentence. Three sentence." },
+          config: { maxSentences: 2 },
+        },
+        {
+          id: "emit",
+          type: "io.write_stdout",
+          input: {
+            label: "summary",
+            content: "{{steps.summarize.output.summary}}",
+          },
+        },
+      ],
+    };
+
+    const trace = await new WorkflowExecutor().execute({
+      workflowPath: join(dir, "workflow.yaml"),
+      workflow,
+      registry: createDefaultRegistry(),
+      traceStore: new TraceStore(join(dir, "runs")),
+      stdoutWriter: async (output) => {
+        emitted.push(output);
+      },
+    });
+
+    assert.equal(trace.status, "success");
+    assert.deepEqual(emitted, [{ content: "One sentence. Two sentence.", label: "summary", newline: true }]);
+    assert.deepEqual(trace.steps[1]?.output, {
+      content: "One sentence. Two sentence.",
+      label: "summary",
+      newline: true,
+      bytes: Buffer.byteLength("summary: One sentence. Two sentence.\n", "utf8"),
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("executor omits raw base64 image payloads from saved traces", async () => {
   const dir = await mkdtemp(join(tmpdir(), "diy-workflow-output-trace-"));
   const imageBase64 = pngFixture().toString("base64");

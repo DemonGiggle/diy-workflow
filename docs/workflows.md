@@ -160,3 +160,5 @@ Each step trace contains:
 - status
 - error
 - metrics
+
+For `io.write_stdout`, the saved step output includes the rendered content, label, newline flag, and byte count so CLI output and the editor's Output panel stay inspectable after the run.

@@ -11,6 +11,7 @@ The visual editor is the UI foundation for composing workflows from typed action
 - edit prompt-oriented action inputs
 - enable action-level mock mode from the config panel
 - run workflows through the local server API
+- inspect stdout-style run output in a dedicated panel
 - inspect saved traces
 - load existing workflow YAML from local files
 - save back to the opened YAML file when supported by the browser
