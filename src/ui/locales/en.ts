@@ -74,6 +74,23 @@ export const en: LocaleResources = {
     "yaml.title": "YAML",
   },
   actions: {
+    "trigger.watch_dir": {
+      label: "Watch Directory",
+      description: "Wait for the first batch of file changes in a directory.",
+      inputFields: {
+        path: { label: "Path", placeholder: "watched" },
+        debounceMs: { label: "Debounce ms", placeholder: "50" },
+      },
+      configFields: {
+        "mock.enabled": { label: "Mock mode" },
+        "mock.directory": { label: "Mock directory", placeholder: "/tmp/watched" },
+        "mock.paths": { label: "Mock paths" },
+      },
+      outputFields: {
+        directory: { label: "Directory" },
+        paths: { label: "Paths" },
+      },
+    },
     "io.read_file": {
       label: "Read File",
       description: "Read a local file and emit extracted text, path, and byte count.",

@@ -46,6 +46,7 @@ The editor can load an existing `.yaml` / `.yml` workflow from local disk, save 
 - Every step has an `id`, action `type`, `input`, and optional `config`.
 - Every action defines typed input and output schemas.
 - Outputs are connected into later inputs with references like `{{steps.read.output.content}}`.
+- Some steps can block until an external condition occurs, such as a filesystem trigger.
 - Workflows are validated before execution.
 - Runs write traces under `runs/run_xxxx/trace.json`.
 
@@ -70,6 +71,7 @@ node dist/cli.js serve --host 127.0.0.1 --port 4173
 
 ## Built-In Actions
 
+- `trigger.watch_dir`
 - `io.read_file`
 - `io.read_image`
 - `io.write_file`

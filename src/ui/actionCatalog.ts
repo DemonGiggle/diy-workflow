@@ -31,6 +31,26 @@ export interface EditorActionDefinition {
 
 export const editorActions: EditorActionDefinition[] = [
   {
+    type: "trigger.watch_dir",
+    namespace: "trigger",
+    label: "Watch Directory",
+    description: "Wait for the first batch of file changes in a directory.",
+    inputFields: [
+      { name: "path", label: "Path", kind: "text", required: true, placeholder: "watched" },
+      { name: "debounceMs", label: "Debounce ms", kind: "number", placeholder: "50" },
+    ],
+    configFields: [
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.directory", label: "Mock directory", kind: "text", placeholder: "/tmp/watched" },
+      { name: "mock.paths", label: "Mock paths", kind: "array" },
+    ],
+    outputFields: [
+      { name: "directory", label: "Directory", kind: "text" },
+      { name: "paths", label: "Paths", kind: "array" },
+    ],
+    createInput: () => ({ path: "watched", debounceMs: 50 }),
+  },
+  {
     type: "io.read_file",
     namespace: "io",
     label: "Read File",

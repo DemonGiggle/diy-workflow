@@ -14,6 +14,7 @@ This page is an index. Detailed behavior, input/output fields, mock settings, an
 
 | Type | Purpose | Reference |
 | --- | --- | --- |
+| `trigger.watch_dir` | Wait for the first batch of file changes in a directory. | [trigger.watch_dir](action-reference/trigger.watch_dir.md) |
 | `io.read_file` | Read a local file and extract text from common document formats. | [io.read_file](action-reference/io.read_file.md) |
 | `io.read_image` | Read a local image and emit a structured image artifact. | [io.read_image](action-reference/io.read_image.md) |
 | `io.write_file` | Write text content to a local file. | [io.write_file](action-reference/io.write_file.md) |
