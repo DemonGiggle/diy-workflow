@@ -116,6 +116,31 @@ export const editorActions: EditorActionDefinition[] = [
     createInput: () => ({ path: "outputs/output.txt", content: "" }),
   },
   {
+    type: "io.write_stdout",
+    namespace: "io",
+    label: "Write Stdout",
+    description: "Emit text or JSON-compatible content to the run output surface.",
+    inputFields: [
+      { name: "content", label: "Content", kind: "json", required: true, connectable: true, placeholder: "Connect text or enter JSON-compatible content" },
+      { name: "label", label: "Label", kind: "text", placeholder: "Optional prefix label" },
+      { name: "newline", label: "Trailing newline", kind: "boolean" },
+    ],
+    configFields: [
+      { name: "mock.enabled", label: "Mock mode", kind: "boolean" },
+      { name: "mock.content", label: "Mock content", kind: "json" },
+      { name: "mock.label", label: "Mock label", kind: "text", placeholder: "preview" },
+      { name: "mock.newline", label: "Mock trailing newline", kind: "boolean" },
+      { name: "mock.bytes", label: "Mock bytes", kind: "number" },
+    ],
+    outputFields: [
+      { name: "content", label: "Content", kind: "textarea" },
+      { name: "label", label: "Label", kind: "text" },
+      { name: "newline", label: "Trailing newline", kind: "boolean" },
+      { name: "bytes", label: "Bytes", kind: "number" },
+    ],
+    createInput: () => ({ content: "", newline: true }),
+  },
+  {
     type: "io.write_image",
     namespace: "io",
     label: "Write Image",

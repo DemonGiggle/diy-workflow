@@ -6,11 +6,11 @@ import { join } from "node:path";
 import { createDefaultRegistry } from "./actions/index.js";
 import { faninAction, fanoutAction } from "./actions/control.js";
 import { exactMatchAction } from "./actions/eval.js";
-import { readFileAction, writeFileAction } from "./actions/io.js";
+import { readFileAction, writeFileAction, writeStdoutAction } from "./actions/io.js";
 import { readImageAction, writeImageAction } from "./actions/image.js";
 import { promptAction, summarizeAction } from "./actions/llm.js";
 import { ocrAction, visionAnalyzeAction } from "./actions/image.js";
-import type { ActionContext } from "./types.js";
+import type { ActionContext, StdoutEmission } from "./types.js";
 import { createLlmRuntime } from "./llmRuntime.js";
 import { Document, Packer, Paragraph } from "docx";
 import PDFDocument from "pdfkit";
@@ -18,7 +18,7 @@ import * as XLSX from "xlsx";
 
 const registry = createDefaultRegistry();
 
-function context(cwd = process.cwd()): ActionContext {
+function context(cwd = process.cwd(), onStdout?: (output: StdoutEmission) => void | Promise<void>): ActionContext {
   const traceMetadata = {};
   return {
     runId: "run_test",
@@ -27,6 +27,9 @@ function context(cwd = process.cwd()): ActionContext {
     registry,
     llm: createLlmRuntime({ workflow: {}, setTraceMetadata: (patch) => Object.assign(traceMetadata, patch) }),
     setTraceMetadata: (patch) => Object.assign(traceMetadata, patch),
+    emitStdout: async (output) => {
+      await onStdout?.(output);
+    },
     runAction: async (type, input, config) => {
       const action = registry.get(type);
       if (!action) throw new Error(`Unknown nested action type: ${type}`);
@@ -54,6 +57,37 @@ test("read_file reads workspace-relative files and supports mock output", async 
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("write_stdout emits text or JSON-compatible content and supports mock mode", async () => {
+  const emitted: StdoutEmission[] = [];
+
+  const direct = await writeStdoutAction.run(
+    { content: { answer: "Hello" }, label: "result", newline: false },
+    context(process.cwd(), async (output) => { emitted.push(output); }),
+  );
+
+  assert.deepEqual(emitted[0], { content: '{\n  "answer": "Hello"\n}', label: "result", newline: false });
+  assert.deepEqual(direct, {
+    content: '{\n  "answer": "Hello"\n}',
+    label: "result",
+    newline: false,
+    bytes: Buffer.byteLength('result: {\n  "answer": "Hello"\n}', "utf8"),
+  });
+
+  const mocked = await writeStdoutAction.run(
+    { content: "ignored", newline: false },
+    context(process.cwd(), async (output) => { emitted.push(output); }),
+    { mock: { enabled: true, content: ["mocked"], label: "preview", newline: true, bytes: 99 } },
+  );
+
+  assert.deepEqual(emitted[1], { content: '[\n  "mocked"\n]', label: "preview", newline: true });
+  assert.deepEqual(mocked, {
+    content: '[\n  "mocked"\n]',
+    label: "preview",
+    newline: true,
+    bytes: 99,
+  });
 });
 
 test("write_file writes text output and supports mock mode", async () => {

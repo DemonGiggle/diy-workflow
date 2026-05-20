@@ -3,7 +3,8 @@ import { dirname, extname, resolve } from "node:path";
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import * as XLSX from "xlsx";
-import type { ActionDefinition } from "../types.js";
+import { measureStdoutEmission, stringifyStdoutContent } from "../stdout.js";
+import type { ActionDefinition, StdoutTraceOutput } from "../types.js";
 import { readMockConfig } from "./mock.js";
 
 interface ReadFileInput {
@@ -27,6 +28,14 @@ interface WriteFileOutput {
   path: string;
   bytes: number;
 }
+
+interface WriteStdoutInput {
+  content: unknown;
+  newline?: boolean;
+  label?: string;
+}
+
+type WriteStdoutOutput = StdoutTraceOutput;
 
 const binaryTextExtensions = new Set([".docx", ".pdf", ".xlsx", ".xls", ".xlsm", ".xlsb"]);
 
@@ -177,3 +186,68 @@ export const writeFileAction: ActionDefinition<WriteFileInput, WriteFileOutput> 
     };
   },
 };
+
+export const writeStdoutAction: ActionDefinition<WriteStdoutInput, WriteStdoutOutput> = {
+  type: "io.write_stdout",
+  description: "Emit text or JSON-compatible content to stdout-style run output.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["content"],
+    properties: {
+      content: {},
+      newline: { type: "boolean", nullable: true },
+      label: { type: "string", minLength: 1, nullable: true },
+    },
+  },
+  configSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      mock: {
+        type: "object",
+        nullable: true,
+        additionalProperties: false,
+        properties: {
+          enabled: { type: "boolean", nullable: true },
+          content: {},
+          newline: { type: "boolean", nullable: true },
+          label: { type: "string", minLength: 1, nullable: true },
+          bytes: { type: "number", minimum: 0, nullable: true },
+        },
+      },
+    },
+  },
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["content", "bytes", "newline"],
+    properties: {
+      content: { type: "string" },
+      bytes: { type: "number" },
+      newline: { type: "boolean" },
+      label: { type: "string", nullable: true },
+    },
+  },
+  async run(input, context, config) {
+    const mock = readMockConfig(config);
+    const output = createStdoutOutput(input, mock);
+    await context.emitStdout({ content: output.content, label: output.label, newline: output.newline });
+    return output;
+  },
+};
+
+function createStdoutOutput(input: WriteStdoutInput, mock?: Record<string, unknown> | null): WriteStdoutOutput {
+  const output = {
+    content: stringifyStdoutContent(
+      mock && Object.prototype.hasOwnProperty.call(mock, "content") ? mock.content : input.content,
+    ),
+    newline: typeof mock?.newline === "boolean" ? mock.newline : input.newline ?? true,
+    ...(typeof mock?.label === "string" ? { label: mock.label } : typeof input.label === "string" ? { label: input.label } : {}),
+  };
+
+  return {
+    ...output,
+    bytes: typeof mock?.bytes === "number" ? mock.bytes : measureStdoutEmission(output),
+  };
+}

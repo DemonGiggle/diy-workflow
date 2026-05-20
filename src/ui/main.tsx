@@ -37,6 +37,7 @@ import { listRuns, runWorkflow, showRun, validateWorkflow } from "./apiClient.js
 import type { OutputDescriptor } from "./actionCatalog.js";
 import { createTranslator, isLocale, localeOptions, localizeAction, localizeActions, type Locale } from "./i18n.js";
 import { createTopbarLayout, type TopbarActionId } from "./topbar.js";
+import { listStdoutEntries } from "./runOutput.js";
 import { formatValidationIssues, parseWorkflowYaml, suggestWorkflowFileName } from "./workflowFiles.js";
 import { calculateDraggedNodePosition, calculateNodeDragOffset, type Point } from "./drag.js";
 import "./styles.css";
@@ -346,6 +347,7 @@ function App() {
             ? selectedStep ? <Inspector state={state} step={selectedStep} locale={locale} t={t} setState={setState} /> : <EmptyInspector t={t} />
             : <ProviderDefaultsPanel state={state} t={t} setState={setState} />}
           <YamlPanel yaml={yaml} t={t} fileName={workflowFileName} />
+          <OutputPanel trace={trace} t={t} />
           <TracePanel trace={trace} runs={runs} statusMessage={statusMessage} t={t} onRefresh={() => refreshRuns(setRuns, setStatusMessage, t)} onShowRun={inspectRun} />
         </aside>
       </section>
@@ -830,6 +832,30 @@ function YamlPanel({ yaml, t, fileName }: { yaml: string; t: Translator; fileNam
       <h2>{t("yaml.title")}</h2>
       {fileName ? <p className="muted">{fileName}</p> : null}
       <pre>{yaml}</pre>
+    </section>
+  );
+}
+
+function OutputPanel({ trace, t }: { trace: RunTrace | null; t: Translator }) {
+  const entries = listStdoutEntries(trace);
+
+  return (
+    <section className="output-panel">
+      <div className="panel-heading"><h2>{t("stdout.title")}</h2></div>
+      {!trace ? <p className="muted">{t("stdout.inspectHint")}</p> : !entries.length ? <p className="muted">{t("stdout.empty")}</p> : (
+        <div className="output-entries">
+          {entries.map((entry, index) => (
+            <article key={`${entry.stepId}-${index}`} className="output-entry">
+              <div className="output-entry-header">
+                <strong>{t("stdout.step", { stepId: entry.stepId })}</strong>
+                <span>{t("stdout.bytes", { bytes: entry.bytes })}</span>
+              </div>
+              {entry.label ? <p className="output-label">{entry.label}</p> : null}
+              <pre>{entry.content}</pre>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

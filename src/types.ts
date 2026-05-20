@@ -56,6 +56,16 @@ export interface LlmExecutionMetadata {
   operation: string;
 }
 
+export interface StdoutEmission {
+  content: string;
+  label?: string;
+  newline: boolean;
+}
+
+export interface StdoutTraceOutput extends StdoutEmission {
+  bytes: number;
+}
+
 export interface StepTraceMetadata {
   llm?: LlmExecutionMetadata;
 }
@@ -71,6 +81,7 @@ export interface ActionContext {
   registry: ActionRegistryLike;
   llm: LlmRuntimeLike;
   setTraceMetadata(metadata: StepTraceMetadata): void;
+  emitStdout(output: StdoutEmission): Promise<void>;
   runAction(type: string, input: unknown, config?: JsonObject): Promise<unknown>;
 }
 
