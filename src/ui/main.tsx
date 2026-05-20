@@ -37,6 +37,7 @@ import { listRuns, runWorkflow, showRun, validateWorkflow } from "./apiClient.js
 import type { OutputDescriptor } from "./actionCatalog.js";
 import { createTranslator, isLocale, localeOptions, localizeAction, localizeActions, type Locale } from "./i18n.js";
 import { formatValidationIssues, parseWorkflowYaml, suggestWorkflowFileName } from "./workflowFiles.js";
+import { calculateDraggedNodePosition, calculateNodeDragOffset, type Point } from "./drag.js";
 import "./styles.css";
 
 const localeStorageKey = "diy-workflow.locale";
@@ -284,20 +285,19 @@ function groupActionsByNamespace(actions: EditorActionDefinition[]): Map<string,
 }
 
 function Canvas({ state, locale, t, setState }: { state: EditorState; locale: Locale; t: Translator; setState: React.Dispatch<React.SetStateAction<EditorState>> }) {
-  const [dragging, setDragging] = useState<{ stepId: string; dx: number; dy: number } | null>(null);
+  const canvasRef = useRef<HTMLElement>(null);
+  const [dragging, setDragging] = useState<{ stepId: string; offset: Point } | null>(null);
   const [linking, setLinking] = useState<{ stepId: string; field: OutputDescriptor } | null>(null);
 
   function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (!dragging) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    setState((current) => moveStep(current, dragging.stepId, {
-      x: Math.max(16, event.clientX - rect.left - dragging.dx),
-      y: Math.max(16, event.clientY - rect.top - dragging.dy),
-    }));
+    const position = calculateDraggedNodePosition({ x: event.clientX, y: event.clientY }, rect, dragging.offset);
+    setState((current) => moveStep(current, dragging.stepId, position));
   }
 
   return (
-    <section className="canvas" onPointerMove={onPointerMove} onPointerUp={() => { setDragging(null); setLinking(null); }} onPointerLeave={() => setDragging(null)}>
+    <section ref={canvasRef} className="canvas" onPointerMove={onPointerMove} onPointerUp={() => { setDragging(null); setLinking(null); }} onPointerLeave={() => setDragging(null)}>
       <div className="canvas-grid" />
       <Connections state={state} />
       {state.workflow.steps.map((step, index) => {
@@ -314,8 +314,11 @@ function Canvas({ state, locale, t, setState }: { state: EditorState; locale: Lo
             <button
               className="drag-handle"
               onPointerDown={(event) => {
+                const canvasRect = canvasRef.current?.getBoundingClientRect();
+                if (!canvasRect) return;
                 event.currentTarget.setPointerCapture(event.pointerId);
-                setDragging({ stepId: step.id, dx: event.nativeEvent.offsetX, dy: event.nativeEvent.offsetY });
+                const offset = calculateNodeDragOffset({ x: event.clientX, y: event.clientY }, canvasRect, pos);
+                setDragging({ stepId: step.id, offset });
               }}
               title={t("editor.dragNode")}
             >
