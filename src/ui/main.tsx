@@ -594,7 +594,7 @@ function ProviderSettings({ state, t, setState }: { state: EditorState; t: Trans
       {catalog.providers.length === 0 && <p className="muted">{t("providers.empty")}</p>}
       <div className="provider-list">
         {catalog.providers.map((provider, providerIndex) => (
-          <article key={`${provider.id}-${providerIndex}`} className="provider-card">
+          <article key={`provider-${providerIndex}`} className="provider-card">
             <div className="provider-card-header">
               <div>
                 <strong>{provider.label}</strong>
@@ -619,7 +619,7 @@ function ProviderSettings({ state, t, setState }: { state: EditorState; t: Trans
 
             <div className="provider-models">
               {provider.models.map((model, modelIndex) => (
-                <section key={`${model.id}-${modelIndex}`} className="model-card">
+                <section key={`provider-${providerIndex}-model-${modelIndex}`} className="model-card">
                   <div className="provider-card-header">
                     <div>
                       <strong>{model.label}</strong>
