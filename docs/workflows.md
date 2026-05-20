@@ -40,6 +40,8 @@ Each step has:
 - `input`: input object validated against the action input schema
 - `config`: optional config object validated against the action config schema
 
+Some actions may block before they produce output. A trigger step still behaves like a normal ordered step: later references can use its output after it completes.
+
 LLM actions can also opt into node-level provider routing inside `config`:
 
 ~~~yaml
@@ -141,7 +143,7 @@ node dist/cli.js validate workflow.yaml
 Executor flow:
 
 ~~~text
-load -> validate -> resolve inputs -> execute -> save trace
+load -> validate -> resolve inputs -> execute/await -> save trace
 ~~~
 
 Traces are saved under:

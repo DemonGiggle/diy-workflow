@@ -74,6 +74,23 @@ export const zhTw: LocaleResources = {
     "yaml.title": "YAML",
   },
   actions: {
+    "trigger.watch_dir": {
+      label: "監看目錄",
+      description: "等待目錄中的第一批檔案變更。",
+      inputFields: {
+        path: { label: "路徑", placeholder: "watched" },
+        debounceMs: { label: "Debounce 毫秒", placeholder: "50" },
+      },
+      configFields: {
+        "mock.enabled": { label: "Mock 模式" },
+        "mock.directory": { label: "Mock 目錄", placeholder: "/tmp/watched" },
+        "mock.paths": { label: "Mock 路徑清單" },
+      },
+      outputFields: {
+        directory: { label: "目錄" },
+        paths: { label: "路徑清單" },
+      },
+    },
     "io.read_file": {
       label: "讀取檔案",
       description: "讀取本機檔案，輸出擷取的文字、路徑與位元組數。",

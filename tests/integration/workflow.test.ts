@@ -1,6 +1,7 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDefaultRegistry } from "../../src/actions/index.js";
@@ -211,6 +212,58 @@ test("executor runs workflow, resolves references, and saves trace", async () =>
     assert.equal(trace.status, "success");
     assert.equal(trace.steps.length, 3);
     assert.deepEqual(trace.steps[2]?.output, { matched: true, actual: "One. Two.", expected: "One. Two." });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("trigger.watch_dir waits for a real file change and exposes paths to later steps", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-trigger-"));
+  try {
+    const watchedDir = join(dir, "watched");
+    const changedFile = join(watchedDir, "changed.txt");
+    await mkdir(watchedDir, { recursive: true });
+
+    const workflow: WorkflowDocument = {
+      name: "watch-dir",
+      steps: [
+        {
+          id: "watch",
+          type: "trigger.watch_dir",
+          input: { path: "watched", debounceMs: 40 },
+        },
+        {
+          id: "eval",
+          type: "eval.exact_match",
+          input: {
+            actual: "{{steps.watch.output.paths}}",
+            expected: [changedFile],
+          },
+        },
+      ],
+    };
+
+    const execution = new WorkflowExecutor().execute({
+      workflowPath: join(dir, "workflow.yaml"),
+      workflow,
+      registry: createDefaultRegistry(),
+      traceStore: new TraceStore(join(dir, "runs")),
+    });
+
+    await delay(100);
+    await writeFile(changedFile, "hello", "utf8");
+
+    const trace = await execution;
+    assert.equal(trace.status, "success");
+    assert.deepEqual(trace.steps[0]?.output, {
+      directory: watchedDir,
+      paths: [changedFile],
+    });
+    assert.deepEqual(trace.steps[1]?.output, {
+      matched: true,
+      actual: [changedFile],
+      expected: [changedFile],
+    });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

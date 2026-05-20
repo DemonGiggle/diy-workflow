@@ -5,7 +5,7 @@ diy-workflow is organized around a small execution engine and UI-friendly schema
 ## Execution Flow
 
 ~~~text
-load -> validate -> resolve inputs -> execute -> save trace
+load -> validate -> resolve inputs -> execute/await -> save trace
 ~~~
 
 For LLM actions, the execute phase now includes provider routing:
@@ -20,6 +20,7 @@ resolve provider/model -> attach safe llm trace metadata -> dispatch adapter -> 
 - `ActionRegistry`: action lookup and schema metadata
 - `WorkflowValidator`: validates workflow shape, provider catalog defaults, unique ids, action types, references, input schemas, and config schemas
 - `WorkflowExecutor`: validates, resolves references, executes ordered steps, and saves traces
+- Trigger-style actions can block inside the normal execute phase and then return typed outputs to later steps
 - `src/providers.ts`: default mock provider catalog and deterministic provider/model resolution helpers
 - `src/llmRuntime.ts`: LLM adapter boundary, provider/model resolution, deterministic mock execution, and placeholder non-mock adapters
 - `TraceStore`: stores and reads run directories under `runs/`

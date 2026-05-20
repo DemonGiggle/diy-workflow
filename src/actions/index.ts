@@ -5,9 +5,11 @@ import { readFileAction, writeFileAction } from "./io.js";
 import { readImageAction, writeImageAction } from "./image.js";
 import { promptAction, summarizeAction } from "./llm.js";
 import { ocrAction, visionAnalyzeAction } from "./image.js";
+import { watchDirAction } from "./trigger.js";
 
 export function createDefaultRegistry(): ActionRegistry {
   const registry = new ActionRegistry();
+  registry.register(watchDirAction);
   registry.register(readFileAction);
   registry.register(writeFileAction);
   registry.register(promptAction);
