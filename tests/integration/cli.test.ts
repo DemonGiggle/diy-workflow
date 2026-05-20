@@ -193,7 +193,9 @@ test("CLI prints stdout action output during workflow runs", async () => {
 
     const run = await runCli(["run", workflowPath], dir);
     assert.equal(run.code, 0);
-    assert.match(run.stdout, /^result: world\r?\nSUCCESS run_0001\r?\nTrace: runs\/run_0001\/trace\.json\r?\n?$/);
+    assert.match(run.stdout, /\[info\] prompt: Completed llm\.prompt/);
+    assert.doesNotMatch(run.stdout, /\[debug\] prompt: Starting llm\.prompt/);
+    assert.match(run.stdout, /result: world\r?\nSUCCESS run_0001\r?\nTrace: runs\/run_0001\/trace\.json/);
 
     const show = await runCli(["runs", "show", "run_0001"], dir);
     assert.equal(show.code, 0);
@@ -227,6 +229,69 @@ test("CLI prints stdout action output during workflow runs", async () => {
         timestamp: trace.logs?.find((log) => log.category === "stdout" && log.stepId === entry.stepId)?.timestamp,
       })),
     );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("CLI filters live logs by threshold and preserves multiline stdout output", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-cli-log-level-"));
+  try {
+    const workflowPath = join(dir, "workflow.yaml");
+    await writeFile(workflowPath, [
+      "name: cli-log-level-test",
+      "steps:",
+      "  - id: prompt",
+      "    type: llm.prompt",
+      "    input:",
+      "      prompt: hello",
+      "    config:",
+      "      mock:",
+      "        enabled: true",
+      "        response: world",
+      "  - id: fanout",
+      "    type: control.fanout",
+      "    input:",
+      "      branches:",
+      "        - id: branch_prompt",
+      "          type: llm.prompt",
+      "          input:",
+      "            prompt: child",
+      "          config:",
+      "            mock:",
+      "              enabled: true",
+      "              response: child ok",
+      "        - id: branch_missing",
+      "          type: missing.action",
+      "          input: {}",
+      "  - id: emit",
+      "    type: io.write_stdout",
+      "    input:",
+      "      label: result",
+      "      content:",
+      "        - line one",
+      "        - line two",
+      "",
+    ].join("\n"), "utf8");
+
+    const warnOnly = await runCli(["run", workflowPath, "--log-level", "warn"], dir);
+    assert.equal(warnOnly.code, 0);
+    assert.match(warnOnly.stdout, /\[warn\] fanout: Fanout completed with 1 failed branch\(es\)/);
+    assert.doesNotMatch(warnOnly.stdout, /\[info\] prompt: Completed llm\.prompt/);
+    assert.doesNotMatch(warnOnly.stdout, /result:/);
+    assert.match(warnOnly.stdout, /SUCCESS run_0001/);
+
+    const verbose = await runCli(["run", workflowPath, "--verbose"], dir);
+    assert.equal(verbose.code, 0);
+    assert.match(verbose.stdout, /\[debug\] prompt: Starting llm\.prompt/);
+    assert.match(verbose.stdout, /\[info\] prompt: Completed llm\.prompt/);
+    assert.match(verbose.stdout, /result: \[\r?\n  "line one",\r?\n  "line two"\r?\n\]\r?\nSUCCESS run_0002/);
+
+    const quiet = await runCli(["run", workflowPath, "--quiet"], dir);
+    assert.equal(quiet.code, 0);
+    assert.doesNotMatch(quiet.stdout, /\[(debug|info|warn|error)\]/);
+    assert.doesNotMatch(quiet.stdout, /result:/);
+    assert.match(quiet.stdout, /^SUCCESS run_0003\r?\nTrace: runs\/run_0003\/trace\.json\r?\n?$/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
