@@ -3,9 +3,10 @@ import { Command } from "commander";
 import { createDefaultRegistry } from "./actions/index.js";
 import { WorkflowExecutor } from "./executor.js";
 import { loadWorkflow } from "./loader.js";
+import { formatRunLogEvent, shouldPrintLogEvent } from "./logs.js";
 import { createWorkflowServer } from "./server.js";
-import { formatStdoutEmission } from "./stdout.js";
 import { TraceStore } from "./trace.js";
+import type { LogLevel } from "./types.js";
 import { WorkflowValidator } from "./validator.js";
 
 const program = new Command();
@@ -37,17 +38,22 @@ program
   .command("run")
   .argument("<workflow>", "workflow YAML file")
   .description("Execute a workflow and save a trace")
-  .action(async (workflowPath: string) => {
+  .option("--log-level <level>", "minimum log level to print: debug, info, warn, error", "info")
+  .option("--quiet", "suppress live log output and keep only the final summary")
+  .option("--verbose", "show debug-level live logs")
+  .action(async (workflowPath: string, options: { logLevel?: string; quiet?: boolean; verbose?: boolean }) => {
     await runCli(async () => {
+      const logLevel = resolveCliLogLevel(options);
       const registry = createDefaultRegistry();
       const workflow = await loadWorkflow(workflowPath);
       const trace = await new WorkflowExecutor().execute({
         workflowPath,
         workflow,
         registry,
-        stdoutWriter: async (output) => {
+        logWriter: async (event) => {
+          if (logLevel === null || !shouldPrintLogEvent(event, logLevel)) return;
           await new Promise<void>((resolvePromise, reject) => {
-            process.stdout.write(formatStdoutEmission(output), (error) => {
+            process.stdout.write(formatRunLogEvent(event), (error) => {
               if (error) reject(error);
               else resolvePromise();
             });
@@ -109,4 +115,12 @@ async function runCli(fn: () => Promise<void>): Promise<void> {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   }
+}
+
+function resolveCliLogLevel(options: { logLevel?: string; quiet?: boolean; verbose?: boolean }): LogLevel | null {
+  if (options.quiet) return null;
+  if (options.verbose) return "debug";
+  const value = options.logLevel ?? "info";
+  if (value === "debug" || value === "info" || value === "warn" || value === "error") return value;
+  throw new Error(`Invalid log level: ${value}`);
 }
