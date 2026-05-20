@@ -104,11 +104,15 @@ textarea { min-height: 82px; resize: vertical; line-height: 1.4; }
 .danger { background: #d92d20; height: 34px; }
 .yaml-panel pre, .output-panel pre, .trace-panel pre { max-height: 260px; overflow: auto; margin: 10px 0 0; background: #101828; color: #e6edf7; border-radius: 6px; padding: 10px; font-size: 12px; line-height: 1.45; }
 .output-entries { display: grid; gap: 10px; }
+.output-panel-heading { justify-content: space-between; align-items: flex-start; gap: 12px; }
+.output-filter { display: grid; gap: 4px; min-width: 132px; margin-left: auto; color: #4b5565; font-size: 12px; }
+.output-filter select { min-width: 0; }
 .output-entry { border: 1px solid #e1e7ef; border-radius: 6px; padding: 10px; }
 .output-entry-header { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; font-size: 13px; }
 .output-entry-header strong { font-size: 13px; }
 .output-entry-header span { color: #667085; font-size: 12px; }
 .output-label { margin: 8px 0 0; color: #576174; font-size: 12px; font-weight: 650; }
+.output-meta { margin: 8px 0 0; color: #667085; font-size: 12px; }
 .output-panel pre { white-space: pre-wrap; word-break: break-word; }
 .trace-panel details { border: 1px solid #e1e7ef; border-radius: 6px; margin-top: 8px; padding: 8px; }
 .trace-panel summary { cursor: pointer; font-size: 13px; font-weight: 700; }
@@ -139,6 +143,8 @@ textarea { min-height: 82px; resize: vertical; line-height: 1.4; }
   .canvas { min-height: 470px; border-bottom: 1px solid #d9dee7; }
   .canvas-toolbar { position: absolute; }
   .minimap { position: absolute; margin: 0; width: 184px; right: 12px; bottom: 12px; }
+  .output-panel-heading { flex-direction: column; align-items: stretch; }
+  .output-filter { width: 100%; margin-left: 0; }
 }
 
 @media (max-width: 480px) {
