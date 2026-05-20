@@ -62,10 +62,17 @@ export const watchDirAction: ActionDefinition<WatchDirInput, WatchDirOutput> = {
     const absoluteDirectory = resolve(context.cwd, input.path);
     const mock = readMockConfig(config);
     if (mock) {
-      return {
+      const output = {
         directory: typeof mock.directory === "string" ? mock.directory : absoluteDirectory,
         paths: Array.isArray(mock.paths) ? mock.paths.filter((value): value is string => typeof value === "string") : [],
       };
+      await context.emitLog({
+        level: "info",
+        category: "trigger.watch_dir",
+        message: `Using mock directory watch for ${output.directory}`,
+        data: { pathCount: output.paths.length, mock: true },
+      });
+      return output;
     }
 
     const info = await stat(absoluteDirectory);
@@ -73,11 +80,24 @@ export const watchDirAction: ActionDefinition<WatchDirInput, WatchDirOutput> = {
       throw new Error(`trigger.watch_dir requires a directory path: ${absoluteDirectory}`);
     }
 
+    await context.emitLog({
+      level: "info",
+      category: "trigger.watch_dir",
+      message: `Watching directory ${absoluteDirectory}`,
+      data: { debounceMs: input.debounceMs ?? 50 },
+    });
     const paths = await waitForDirectoryChanges(absoluteDirectory, input.debounceMs ?? 50);
-    return {
+    const output = {
       directory: absoluteDirectory,
       paths,
     };
+    await context.emitLog({
+      level: "info",
+      category: "trigger.watch_dir",
+      message: `Detected ${paths.length} changed path(s) in ${absoluteDirectory}`,
+      data: { pathCount: paths.length },
+    });
+    return output;
   },
 };
 

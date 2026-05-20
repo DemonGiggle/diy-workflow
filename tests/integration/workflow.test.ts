@@ -211,7 +211,15 @@ test("executor runs workflow, resolves references, and saves trace", async () =>
     });
     assert.equal(trace.status, "success");
     assert.equal(trace.steps.length, 3);
-    assert.deepEqual(trace.logs, []);
+    assert.deepEqual(trace.logs?.map((event) => ({
+      level: event.level,
+      stepId: event.stepId,
+      category: event.category,
+    })), [
+      { level: "info", stepId: "read", category: "io.read_file" },
+      { level: "debug", stepId: "summary", category: "llm.summarize" },
+      { level: "info", stepId: "summary", category: "llm.summarize" },
+    ]);
     assert.deepEqual(trace.steps[2]?.output, { matched: true, actual: "One. Two.", expected: "One. Two." });
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -262,6 +270,133 @@ test("executor persists ordered run log events for stdout actions", async () => 
       },
     ]);
     assert.deepEqual(saved.logs, trace.logs);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("executor records structured logs from representative actions and nested branches", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "diy-workflow-structured-logs-"));
+  try {
+    const workflow: WorkflowDocument = {
+      name: "structured-logs",
+      steps: [
+        {
+          id: "read",
+          type: "io.read_file",
+          input: { path: "missing.txt" },
+          config: { mock: { enabled: true, path: "mock://input.txt", content: "Alpha", bytes: 5 } },
+        },
+        {
+          id: "watch",
+          type: "trigger.watch_dir",
+          input: { path: "watched" },
+          config: { mock: { enabled: true, directory: "/tmp/watched", paths: ["/tmp/watched/a.txt"] } },
+        },
+        {
+          id: "prompt",
+          type: "llm.prompt",
+          input: { prompt: "hello {{steps.read.output.content}}" },
+          config: { mock: { enabled: true, response: "world" } },
+        },
+        {
+          id: "fanout",
+          type: "control.fanout",
+          input: {
+            value: "Seed",
+            branches: [
+              {
+                id: "branch_prompt",
+                type: "llm.prompt",
+                input: { prompt: "{{input}} branch" },
+                config: { mock: { enabled: true, response: "branch ok" } },
+              },
+              {
+                id: "branch_missing",
+                type: "missing.action",
+                input: {},
+              },
+            ],
+          },
+        },
+        {
+          id: "fanin",
+          type: "control.fanin",
+          input: { items: "{{steps.fanout.output.results}}" },
+          config: { strategy: "first_success" },
+        },
+      ],
+    };
+
+    const trace = await new WorkflowExecutor().execute({
+      workflowPath: join(dir, "workflow.yaml"),
+      workflow,
+      registry: createDefaultRegistry(),
+      traceStore: new TraceStore(join(dir, "runs")),
+    });
+
+    assert.equal(trace.status, "success");
+    assert.deepEqual(trace.logs?.map((event) => ({
+      level: event.level,
+      stepId: event.stepId,
+      category: event.category,
+      message: event.message,
+    })), [
+      {
+        level: "info",
+        stepId: "read",
+        category: "io.read_file",
+        message: "Read mock file mock://input.txt",
+      },
+      {
+        level: "info",
+        stepId: "watch",
+        category: "trigger.watch_dir",
+        message: "Using mock directory watch for /tmp/watched",
+      },
+      {
+        level: "debug",
+        stepId: "prompt",
+        category: "llm.prompt",
+        message: "Starting llm.prompt",
+      },
+      {
+        level: "info",
+        stepId: "prompt",
+        category: "llm.prompt",
+        message: "Completed llm.prompt",
+      },
+      {
+        level: "debug",
+        stepId: "fanout",
+        category: "control.fanout",
+        message: "Starting fanout across 2 branch(es)",
+      },
+      {
+        level: "debug",
+        stepId: "fanout",
+        category: "llm.prompt",
+        message: "Starting llm.prompt",
+      },
+      {
+        level: "info",
+        stepId: "fanout",
+        category: "llm.prompt",
+        message: "Completed llm.prompt",
+      },
+      {
+        level: "warn",
+        stepId: "fanout",
+        category: "control.fanout",
+        message: "Fanout completed with 1 failed branch(es)",
+      },
+      {
+        level: "info",
+        stepId: "fanin",
+        category: "control.fanin",
+        message: "Fanin selected the first successful item",
+      },
+    ]);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

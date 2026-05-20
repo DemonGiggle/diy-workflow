@@ -10,7 +10,7 @@ import { readFileAction, writeFileAction, writeStdoutAction } from "./actions/io
 import { readImageAction, writeImageAction } from "./actions/image.js";
 import { promptAction, summarizeAction } from "./actions/llm.js";
 import { ocrAction, visionAnalyzeAction } from "./actions/image.js";
-import type { ActionContext, StdoutEmission } from "./types.js";
+import type { ActionContext, ActionLogEvent, StdoutEmission } from "./types.js";
 import { createLlmRuntime } from "./llmRuntime.js";
 import { Document, Packer, Paragraph } from "docx";
 import PDFDocument from "pdfkit";
@@ -18,7 +18,11 @@ import * as XLSX from "xlsx";
 
 const registry = createDefaultRegistry();
 
-function context(cwd = process.cwd(), onStdout?: (output: StdoutEmission) => void | Promise<void>): ActionContext {
+function context(
+  cwd = process.cwd(),
+  onStdout?: (output: StdoutEmission) => void | Promise<void>,
+  onLog?: (event: ActionLogEvent) => void | Promise<void>,
+): ActionContext {
   const traceMetadata = {};
   return {
     runId: "run_test",
@@ -27,6 +31,9 @@ function context(cwd = process.cwd(), onStdout?: (output: StdoutEmission) => voi
     registry,
     llm: createLlmRuntime({ workflow: {}, setTraceMetadata: (patch) => Object.assign(traceMetadata, patch) }),
     setTraceMetadata: (patch) => Object.assign(traceMetadata, patch),
+    emitLog: async (event) => {
+      await onLog?.(event);
+    },
     emitStdout: async (output) => {
       await onStdout?.(output);
     },

@@ -1,6 +1,6 @@
 import { Ajv } from "ajv";
 import { dirname, resolve } from "node:path";
-import type { ActionContext, JsonObject, RunLogEvent, RunTrace, StepTrace, WorkflowDocument } from "./types.js";
+import type { ActionContext, ActionLogEvent, JsonObject, RunLogEvent, RunTrace, StepTrace, WorkflowDocument } from "./types.js";
 import type { ActionRegistry } from "./registry.js";
 import { createLlmRuntime } from "./llmRuntime.js";
 import { resolveReferences, type StepOutputRecord } from "./references.js";
@@ -81,8 +81,11 @@ export class WorkflowExecutor {
           setTraceMetadata: (patch) => {
             metadata = { ...metadata, ...patch };
           },
+          emitLog: async (event: ActionLogEvent) => {
+            await appendLog({ stepId: step.id, ...event });
+          },
           emitStdout: async (output) => {
-            await appendLog(stdoutEmissionToLogEvent(step.id, output));
+            await appendLog({ stepId: step.id, ...stdoutEmissionToLogEvent(output) });
             await options.stdoutWriter?.(output);
           },
           runAction: async (type: string, input: unknown, config?: JsonObject) => {
@@ -104,6 +107,12 @@ export class WorkflowExecutor {
         stepStatus = "failed";
         status = "failed";
         error = caught instanceof Error ? caught.message : String(caught);
+        await appendLog({
+          stepId: step.id,
+          level: "error",
+          category: "step",
+          message: error,
+        });
         if (traceInput === null) {
           traceInput = action.sanitizeTraceInput ? action.sanitizeTraceInput(resolvedInput as never) : resolvedInput;
         }

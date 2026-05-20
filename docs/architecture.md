@@ -14,6 +14,12 @@ For LLM actions, the execute phase now includes provider routing:
 resolve provider/model -> attach safe llm trace metadata -> dispatch adapter -> save trace
 ~~~
 
+Run logging is also executor-owned:
+
+~~~text
+action emitLog/emitStdout -> executor appends ordered run log event -> trace persists logs[]
+~~~
+
 ## Core Components
 
 - `ActionDefinition`: reusable typed building block with `type`, schemas, optional config schema, and `run(input, context)`
@@ -98,3 +104,14 @@ Other provider kinds currently act as scaffolding:
 - once credentials are present, the runtime still returns a clear "not implemented yet" error until a real adapter lands
 
 Trace files never include provider `apiKeyRef` or resolved secret values. They only store safe execution metadata such as provider/model ids.
+
+## Action Logging Guidance
+
+Actions can emit replayable run logs through `ActionContext.emitLog(...)`. Keep them small, human-readable, and safe to persist.
+
+- Use `debug` for start/end detail or internal progress that helps explain execution without cluttering the default view too much.
+- Use `info` for meaningful progress or successful external effects, such as reading a file, writing a file, or completing a provider call.
+- Use `warn` for degraded but non-fatal outcomes, such as partial fanout failures or fallback behavior.
+- Use `error` for failed execution that should be visible in replay even when the step ultimately aborts.
+- Avoid logging secrets, raw credentials, or oversized payloads. Prefer summaries like counts, ids, sizes, and selected labels.
+- `emitStdout(...)` remains as a compatibility helper for stdout-style output; new action-level instrumentation should prefer `emitLog(...)`.

@@ -90,9 +90,22 @@ export const fanoutAction: ActionDefinition<FanoutInput, FanoutOutput> = {
   async run(input, context, config) {
     const mock = readMockConfig(config);
     if (mock) {
-      return { results: Array.isArray(mock.results) ? mock.results as FanoutOutput["results"] : [] };
+      const results = Array.isArray(mock.results) ? mock.results as FanoutOutput["results"] : [];
+      await context.emitLog({
+        level: "info",
+        category: "control.fanout",
+        message: `Using mock fanout result set with ${results.length} branch(es)`,
+        data: { branchCount: results.length, mock: true },
+      });
+      return { results };
     }
 
+    await context.emitLog({
+      level: "debug",
+      category: "control.fanout",
+      message: `Starting fanout across ${input.branches.length} branch(es)`,
+      data: { branchCount: input.branches.length },
+    });
     const results = await Promise.all(input.branches.map(async (branch) => {
       try {
         const branchInput = injectFanoutValue(branch.input, input.value);
@@ -108,6 +121,15 @@ export const fanoutAction: ActionDefinition<FanoutInput, FanoutOutput> = {
         };
       }
     }));
+    const failures = results.filter((result) => result.status === "failed").length;
+    await context.emitLog({
+      level: failures ? "warn" : "info",
+      category: "control.fanout",
+      message: failures
+        ? `Fanout completed with ${failures} failed branch(es)`
+        : `Fanout completed successfully across ${results.length} branch(es)`,
+      data: { branchCount: results.length, failureCount: failures },
+    });
     return { results };
   },
 };
@@ -151,23 +173,44 @@ export const faninAction: ActionDefinition<FaninInput, FaninOutput> = {
       },
     },
   },
-  async run(input, _context, config) {
+  async run(input, context, config) {
     const mock = readMockConfig(config);
     if (mock) {
-      const strategy = mock.strategy === "first_success" ? "first_success" : "merge";
-      return {
+      const strategy = (mock.strategy === "first_success" ? "first_success" : "merge") as "merge" | "first_success";
+      const output = {
         strategy,
         output: "output" in mock ? mock.output : null,
         count: typeof mock.count === "number" ? mock.count : 0,
       };
+      await context.emitLog({
+        level: "info",
+        category: "control.fanin",
+        message: `Using mock fanin output with strategy ${strategy}`,
+        data: { count: output.count, mock: true },
+      });
+      return output;
     }
 
     const strategy = (config?.strategy === "first_success" ? "first_success" : "merge") as "merge" | "first_success";
     if (strategy === "first_success") {
       const first = input.items.find((item) => isSuccessResult(item));
-      return { strategy, output: first ?? null, count: first ? 1 : 0 };
+      const output = { strategy, output: first ?? null, count: first ? 1 : 0 };
+      await context.emitLog({
+        level: first ? "info" : "warn",
+        category: "control.fanin",
+        message: first ? "Fanin selected the first successful item" : "Fanin found no successful items",
+        data: { count: output.count, strategy },
+      });
+      return output;
     }
-    return { strategy, output: mergeItems(input.items), count: input.items.length };
+    const output = { strategy, output: mergeItems(input.items), count: input.items.length };
+    await context.emitLog({
+      level: "info",
+      category: "control.fanin",
+      message: `Fanin merged ${input.items.length} item(s)`,
+      data: { count: output.count, strategy },
+    });
+    return output;
   },
 };
 

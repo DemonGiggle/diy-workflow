@@ -115,17 +115,31 @@ export const readFileAction: ActionDefinition<ReadFileInput, ReadFileOutput> = {
     const mock = readMockConfig(config);
     if (mock) {
       const content = typeof mock.content === "string" ? mock.content : "";
-      return {
+      const output = {
         path: typeof mock.path === "string" ? mock.path : input.path,
         content,
         bytes: typeof mock.bytes === "number" ? mock.bytes : Buffer.byteLength(content, input.encoding ?? "utf8"),
       };
+      await context.emitLog({
+        level: "info",
+        category: "io.read_file",
+        message: `Read mock file ${output.path}`,
+        data: { bytes: output.bytes, mock: true },
+      });
+      return output;
     }
 
     const encoding = input.encoding ?? "utf8";
     const absolute = resolve(context.cwd, input.path);
     const [content, info] = await Promise.all([extractTextFromFile(absolute, encoding), stat(absolute)]);
-    return { path: absolute, content, bytes: info.size };
+    const output = { path: absolute, content, bytes: info.size };
+    await context.emitLog({
+      level: "info",
+      category: "io.read_file",
+      message: `Read file ${absolute}`,
+      data: { bytes: info.size },
+    });
+    return output;
   },
 };
 
@@ -171,19 +185,33 @@ export const writeFileAction: ActionDefinition<WriteFileInput, WriteFileOutput> 
     const encoding = input.encoding ?? "utf8";
     const mock = readMockConfig(config);
     if (mock) {
-      return {
+      const output = {
         path: typeof mock.path === "string" ? mock.path : input.path,
         bytes: typeof mock.bytes === "number" ? mock.bytes : Buffer.byteLength(input.content, encoding),
       };
+      await context.emitLog({
+        level: "info",
+        category: "io.write_file",
+        message: `Prepared mock file write ${output.path}`,
+        data: { bytes: output.bytes, mock: true },
+      });
+      return output;
     }
 
     const absolutePath = resolve(context.cwd, input.path);
     await mkdir(dirname(absolutePath), { recursive: true });
     await writeFile(absolutePath, input.content, encoding);
-    return {
+    const output = {
       path: absolutePath,
       bytes: Buffer.byteLength(input.content, encoding),
     };
+    await context.emitLog({
+      level: "info",
+      category: "io.write_file",
+      message: `Wrote file ${absolutePath}`,
+      data: { bytes: output.bytes },
+    });
+    return output;
   },
 };
 

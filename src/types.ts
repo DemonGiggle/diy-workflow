@@ -68,6 +68,16 @@ export interface StdoutTraceOutput extends StdoutEmission {
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
+export interface ActionLogEvent {
+  level: LogLevel;
+  message: string;
+  label?: string;
+  category?: string;
+  data?: unknown;
+  newline?: boolean;
+  bytes?: number;
+}
+
 export interface RunLogEvent {
   index: number;
   timestamp: string;
@@ -96,6 +106,7 @@ export interface ActionContext {
   registry: ActionRegistryLike;
   llm: LlmRuntimeLike;
   setTraceMetadata(metadata: StepTraceMetadata): void;
+  emitLog(event: ActionLogEvent): Promise<void>;
   emitStdout(output: StdoutEmission): Promise<void>;
   runAction(type: string, input: unknown, config?: JsonObject): Promise<unknown>;
 }

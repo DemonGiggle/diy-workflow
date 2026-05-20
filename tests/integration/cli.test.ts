@@ -209,16 +209,24 @@ test("CLI prints stdout action output during workflow runs", async () => {
       newline: true,
       bytes: Buffer.byteLength("result: world\n", "utf8"),
     });
-    assert.deepEqual(trace.logs, [
-      {
-        stepId: "emit",
-        category: "stdout",
-        message: "world",
-        label: "result",
-        newline: true,
-        bytes: Buffer.byteLength("result: world\n", "utf8"),
-      },
-    ].map((entry, index) => ({ ...entry, index, level: "info", timestamp: trace.logs?.[index]?.timestamp })));
+    assert.deepEqual(
+      trace.logs?.filter((entry) => entry.category === "stdout"),
+      [
+        {
+          stepId: "emit",
+          category: "stdout",
+          message: "world",
+          label: "result",
+          newline: true,
+          bytes: Buffer.byteLength("result: world\n", "utf8"),
+        },
+      ].map((entry) => ({
+        ...entry,
+        index: trace.logs?.find((log) => log.category === "stdout" && log.stepId === entry.stepId)?.index,
+        level: "info",
+        timestamp: trace.logs?.find((log) => log.category === "stdout" && log.stepId === entry.stepId)?.timestamp,
+      })),
+    );
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

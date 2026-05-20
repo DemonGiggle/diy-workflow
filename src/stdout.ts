@@ -1,4 +1,4 @@
-import type { RunLogEvent, StdoutEmission } from "./types.js";
+import type { ActionLogEvent, StdoutEmission } from "./types.js";
 
 export function stringifyStdoutContent(value: unknown): string {
   if (typeof value === "string") return value;
@@ -19,10 +19,9 @@ export function measureStdoutEmission(output: StdoutEmission): number {
   return Buffer.byteLength(formatStdoutEmission(output), "utf8");
 }
 
-export function stdoutEmissionToLogEvent(stepId: string, output: StdoutEmission): Omit<RunLogEvent, "index" | "timestamp"> {
+export function stdoutEmissionToLogEvent(output: StdoutEmission): ActionLogEvent {
   return {
     level: "info",
-    stepId,
     message: output.content,
     ...(output.label ? { label: output.label } : {}),
     category: "stdout",
