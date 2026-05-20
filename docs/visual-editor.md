@@ -17,6 +17,13 @@ The visual editor is the UI foundation for composing workflows from typed action
 - download YAML when native file-save access is unavailable
 - copy generated YAML
 
+The top navigation keeps the most common actions visible and grouped:
+
+- view switching stays always visible
+- run controls keep validate and run together
+- workflow file actions live in a dedicated workflow menu
+- lower-frequency controls such as locale and recent-run access live in a secondary menu
+
 ## Typed Connections
 
 The editor relies on action schemas and field descriptors to decide which ports can connect.
