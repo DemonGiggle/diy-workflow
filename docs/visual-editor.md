@@ -11,7 +11,7 @@ The visual editor is the UI foundation for composing workflows from typed action
 - edit prompt-oriented action inputs
 - enable action-level mock mode from the config panel
 - run workflows through the local server API
-- inspect stdout-style run output in a dedicated panel
+- inspect persisted node logs in a dedicated Output panel
 - inspect saved traces
 - load existing workflow YAML from local files
 - save back to the opened YAML file when supported by the browser
@@ -32,6 +32,12 @@ Canvas navigation now treats zoom as a pure view transform:
 - node coordinates remain in stable model space
 - dragging and connection hit targets continue to resolve against model-space positions
 - the minimap derives from the same layout state instead of maintaining a second canvas model
+
+The Output panel now acts as a run log viewer:
+
+- it renders persisted log events from any node, not only `io.write_stdout`
+- a log-level dropdown filters the visible entries without mutating the saved trace
+- legacy runs that only stored stdout-style outputs still remain readable
 
 ## Typed Connections
 

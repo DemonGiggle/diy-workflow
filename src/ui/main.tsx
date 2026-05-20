@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Cable, CheckCircle2, CirclePlay, Copy, Download, FileCode2, FolderOpen, Grip, LocateFixed, Minus, MoreHorizontal, Plus, Save, Settings2, Trash2 } from "lucide-react";
 import YAML from "yaml";
-import type { LlmProviderKind, RunTrace, WorkflowStep } from "../types.js";
+import type { LlmProviderKind, LogLevel, RunTrace, WorkflowStep } from "../types.js";
 import { isLlmActionType, listSelectableModels } from "../providers.js";
 import { editorActions, getEditorAction, type EditorActionDefinition, type FieldDescriptor } from "./actionCatalog.js";
 import {
@@ -37,7 +37,7 @@ import { listRuns, runWorkflow, showRun, validateWorkflow } from "./apiClient.js
 import type { OutputDescriptor } from "./actionCatalog.js";
 import { createTranslator, isLocale, localeOptions, localizeAction, localizeActions, type Locale } from "./i18n.js";
 import { createTopbarLayout, type TopbarActionId } from "./topbar.js";
-import { listStdoutEntries } from "./runOutput.js";
+import { listRunOutputEntries } from "./runOutput.js";
 import { formatValidationIssues, parseWorkflowYaml, suggestWorkflowFileName } from "./workflowFiles.js";
 import {
   calculateDraggedNodePosition,
@@ -1048,21 +1048,35 @@ function YamlPanel({ yaml, t, fileName }: { yaml: string; t: Translator; fileNam
 }
 
 function OutputPanel({ trace, t }: { trace: RunTrace | null; t: Translator }) {
-  const entries = listStdoutEntries(trace);
+  const [logLevel, setLogLevel] = useState<LogLevel>("info");
+  const entries = useMemo(() => listRunOutputEntries(trace, logLevel), [logLevel, trace]);
+  const categoryLabel = (category?: string): string => category ?? "log";
 
   return (
     <section className="output-panel">
-      <div className="panel-heading"><h2>{t("stdout.title")}</h2></div>
-      {!trace ? <p className="muted">{t("stdout.inspectHint")}</p> : !entries.length ? <p className="muted">{t("stdout.empty")}</p> : (
+      <div className="panel-heading output-panel-heading">
+        <h2>{t("output.title")}</h2>
+        <label className="output-filter">
+          <span>{t("output.levelFilter")}</span>
+          <select value={logLevel} onChange={(event) => setLogLevel(event.target.value as LogLevel)}>
+            <option value="debug">{t("output.level.debug")}</option>
+            <option value="info">{t("output.level.info")}</option>
+            <option value="warn">{t("output.level.warn")}</option>
+            <option value="error">{t("output.level.error")}</option>
+          </select>
+        </label>
+      </div>
+      {!trace ? <p className="muted">{t("output.inspectHint")}</p> : !entries.length ? <p className="muted">{t("output.empty")}</p> : (
         <div className="output-entries">
           {entries.map((entry, index) => (
             <article key={`${entry.stepId}-${index}`} className="output-entry">
               <div className="output-entry-header">
-                <strong>{t("stdout.step", { stepId: entry.stepId })}</strong>
-                <span>{t("stdout.bytes", { bytes: entry.bytes })}</span>
+                <strong>{t("output.step", { stepId: entry.stepId })}</strong>
+                <span>{t("output.meta", { level: entry.level.toUpperCase(), category: categoryLabel(entry.category) })}</span>
               </div>
               {entry.label ? <p className="output-label">{entry.label}</p> : null}
-              <pre>{entry.content}</pre>
+              {typeof entry.bytes === "number" ? <p className="output-meta">{t("output.bytes", { bytes: entry.bytes })}</p> : null}
+              <pre>{entry.message}</pre>
             </article>
           ))}
         </div>
