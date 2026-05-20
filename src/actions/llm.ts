@@ -61,7 +61,20 @@ export const promptAction: ActionDefinition<PromptInput, PromptOutput> = {
     },
   },
   async run(input, context, config) {
-    return await context.llm.run<PromptOutput>("llm.prompt", input, config);
+    await context.emitLog({
+      level: "debug",
+      category: "llm.prompt",
+      message: "Starting llm.prompt",
+      data: { promptLength: input.prompt.length },
+    });
+    const output = await context.llm.run<PromptOutput>("llm.prompt", input, config);
+    await context.emitLog({
+      level: "info",
+      category: "llm.prompt",
+      message: "Completed llm.prompt",
+      data: { textLength: output.text.length },
+    });
+    return output;
   },
 };
 
@@ -105,6 +118,19 @@ export const summarizeAction: ActionDefinition<SummarizeInput, SummarizeOutput> 
     },
   },
   async run(input, context, config) {
-    return await context.llm.run<SummarizeOutput>("llm.summarize", input, config);
+    await context.emitLog({
+      level: "debug",
+      category: "llm.summarize",
+      message: "Starting llm.summarize",
+      data: { textLength: input.text.length },
+    });
+    const output = await context.llm.run<SummarizeOutput>("llm.summarize", input, config);
+    await context.emitLog({
+      level: "info",
+      category: "llm.summarize",
+      message: "Completed llm.summarize",
+      data: { summaryLength: output.summary.length, sentenceCount: output.sentenceCount },
+    });
+    return output;
   },
 };
