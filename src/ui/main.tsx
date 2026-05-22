@@ -81,6 +81,7 @@ function App() {
   const saveUsesFileSystemApi = workflowFileHandle !== null || supportsSavePicker();
   const saveActionLabel = saveUsesFileSystemApi ? t("yaml.saveAction") : t("yaml.downloadAction");
   const topbarLayout = useMemo(() => createTopbarLayout({ saveUsesFileSystemApi, hasRuns: runs.length > 0 }), [saveUsesFileSystemApi, runs.length]);
+  const latestRunLabel = runs[0] ?? t("topbar.noRuns");
 
   useEffect(() => {
     window.localStorage?.setItem(localeStorageKey, locale);
@@ -249,95 +250,102 @@ function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="topbar-brand">
-          <div>
-            <h1>diy-workflow</h1>
-            <span>{t("app.subtitle")}</span>
+        <div className="topbar-main">
+          <div className="topbar-brand">
+            <div>
+              <h1>diy-workflow</h1>
+              <span>{t("app.subtitle")}</span>
+            </div>
           </div>
-          <div className="topbar-context">
-            <span className="topbar-chip">
+          <div className="topbar-actions">
+            <details className="topbar-menu">
+              <summary className="topbar-menubar-button">
+                <FolderOpen size={16}/>
+                {t("topbar.fileGroup")}
+              </summary>
+              <div className="topbar-menu-panel" role="menu" aria-label={t("topbar.fileGroup")}>
+                {topbarLayout.workflowMenuActions.map((action) => (
+                  <button
+                    key={action.id}
+                    className="secondary topbar-menu-item"
+                    onClick={(event) => void handleTopbarAction(action.id, event.currentTarget)}
+                  >
+                    {iconForTopbarAction(action.id, saveUsesFileSystemApi)}
+                    {action.id === "save-workflow" ? saveActionLabel : t(action.labelKey)}
+                  </button>
+                ))}
+              </div>
+            </details>
+
+            <section className="topbar-group topbar-run-group">
+              <div className="topbar-button-row">
+                {topbarLayout.runActions.map((action) => (
+                  <button
+                    key={action.id}
+                    className={action.emphasis === "primary" ? undefined : "secondary"}
+                    disabled={isRunning && action.id !== "validate-workflow"}
+                    onClick={(event) => void handleTopbarAction(action.id, event.currentTarget)}
+                  >
+                    {iconForTopbarAction(action.id, saveUsesFileSystemApi)}
+                    {action.id === "run-workflow" && isRunning ? t("run.running") : t(action.labelKey)}
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <div className="topbar-utility">
+            <details className="topbar-menu">
+              <summary className="topbar-menubar-button">
+                <MoreHorizontal size={16}/>
+                {t("topbar.moreGroup")}
+              </summary>
+              <div className="topbar-menu-panel topbar-menu-panel-wide" role="menu" aria-label={t("topbar.moreGroup")}>
+                <label className="topbar-menu-field">
+                  <span>{t("locale.label")}</span>
+                  <select
+                    value={locale}
+                    onChange={(event) => {
+                      setLocale(event.target.value as Locale);
+                    }}
+                  >
+                    {localeOptions.map((option) => <option key={option.locale} value={option.locale}>{option.label}</option>)}
+                  </select>
+                </label>
+                <div className="topbar-menu-divider" />
+                {topbarLayout.moreMenuActions.map((action) => (
+                  <button
+                    key={action.id}
+                    className="secondary topbar-menu-item"
+                    onClick={(event) => void handleTopbarAction(action.id, event.currentTarget)}
+                  >
+                    {iconForTopbarAction(action.id, saveUsesFileSystemApi)}
+                    {t(action.labelKey)}
+                  </button>
+                ))}
+              </div>
+            </details>
+          </div>
+        </div>
+        <div className="topbar-statusbar">
+          <div className="topbar-status-items">
+            <span className="topbar-meta">
               <strong>{t("topbar.currentFile")}</strong>
               {workflowFileName ?? t("topbar.unsavedWorkflow")}
             </span>
-            <span className={`topbar-chip topbar-status ${isRunning ? "is-running" : ""}`}>{statusMessage}</span>
+            <span className={`topbar-meta topbar-status-meta ${isRunning ? "is-running" : ""}`}>
+              <strong>{t("topbar.runStatus")}</strong>
+              {statusMessage}
+            </span>
+            <span className="topbar-meta">
+              <strong>{t("run.title")}</strong>
+              {latestRunLabel}
+            </span>
           </div>
-        </div>
-        <div className="topbar-actions">
-          <section className="topbar-group">
-            <span className="topbar-group-label">{t("topbar.viewGroup")}</span>
-            <div className="view-switch" role="tablist" aria-label="Editor view">
-              <button className={view === "workflow" ? "secondary active-tab" : "secondary"} onClick={() => setView("workflow")}>{t("view.workflow")}</button>
-              <button className={view === "providers" ? "secondary active-tab" : "secondary"} onClick={() => setView("providers")}>{t("view.providers")}</button>
-            </div>
-          </section>
-
-          <details className="topbar-menu">
-            <summary className="secondary">
-              <FolderOpen size={16}/>
-              {t("topbar.workflowGroup")}
-            </summary>
-            <div className="topbar-menu-panel" role="menu" aria-label={t("topbar.workflowGroup")}>
-              {topbarLayout.workflowMenuActions.map((action) => (
-                <button
-                  key={action.id}
-                  className="secondary topbar-menu-item"
-                  onClick={(event) => void handleTopbarAction(action.id, event.currentTarget)}
-                >
-                  {iconForTopbarAction(action.id, saveUsesFileSystemApi)}
-                  {action.id === "save-workflow" ? saveActionLabel : t(action.labelKey)}
-                </button>
-              ))}
-            </div>
-          </details>
-
-          <section className="topbar-group topbar-run-group">
-            <span className="topbar-group-label">{t("topbar.runGroup")}</span>
-            <div className="topbar-button-row">
-              {topbarLayout.runActions.map((action) => (
-                <button
-                  key={action.id}
-                  className={action.emphasis === "primary" ? undefined : "secondary"}
-                  disabled={isRunning && action.id !== "validate-workflow"}
-                  onClick={(event) => void handleTopbarAction(action.id, event.currentTarget)}
-                >
-                  {iconForTopbarAction(action.id, saveUsesFileSystemApi)}
-                  {action.id === "run-workflow" && isRunning ? t("run.running") : t(action.labelKey)}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <details className="topbar-menu">
-            <summary className="secondary">
-              <MoreHorizontal size={16}/>
-              {t("topbar.moreGroup")}
-            </summary>
-            <div className="topbar-menu-panel topbar-menu-panel-wide" role="menu" aria-label={t("topbar.moreGroup")}>
-              <label className="topbar-menu-field">
-                <span>{t("locale.label")}</span>
-                <select
-                  value={locale}
-                  onChange={(event) => {
-                    setLocale(event.target.value as Locale);
-                    closeTopbarMenu(event.currentTarget);
-                  }}
-                >
-                  {localeOptions.map((option) => <option key={option.locale} value={option.locale}>{option.label}</option>)}
-                </select>
-              </label>
-              <div className="topbar-menu-divider" />
-              {topbarLayout.moreMenuActions.map((action) => (
-                <button
-                  key={action.id}
-                  className="secondary topbar-menu-item"
-                  onClick={(event) => void handleTopbarAction(action.id, event.currentTarget)}
-                >
-                  {iconForTopbarAction(action.id, saveUsesFileSystemApi)}
-                  {t(action.labelKey)}
-                </button>
-              ))}
-            </div>
-          </details>
+          <div className="view-switch" role="tablist" aria-label="Editor view">
+            <button className={view === "workflow" ? "secondary active-tab" : "secondary"} onClick={() => setView("workflow")}>{t("view.workflow")}</button>
+            <button className={view === "providers" ? "secondary active-tab" : "secondary"} onClick={() => setView("providers")}>{t("view.providers")}</button>
+          </div>
         </div>
       </header>
       <input ref={fileInputRef} type="file" accept=".yaml,.yml" hidden onChange={handleFileInputChange} />
