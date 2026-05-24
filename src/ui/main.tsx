@@ -823,7 +823,7 @@ function Inspector({ state, step, locale, t, setState }: { state: EditorState; s
   );
 }
 
-export function LlmSelectionEditor({ state, step, t, setState }: {
+function LlmSelectionEditor({ state, step, t, setState }: {
   state: EditorState;
   step: WorkflowStep;
   t: Translator;
