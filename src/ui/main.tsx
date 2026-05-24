@@ -36,6 +36,7 @@ import {
 import { listRuns, runWorkflow, showRun, validateWorkflow } from "./apiClient.js";
 import type { OutputDescriptor } from "./actionCatalog.js";
 import { createTranslator, isLocale, localeOptions, localizeAction, localizeActions, type Locale } from "./i18n.js";
+import { isLlmProviderSelectionDisabled } from "./llmSelection.js";
 import { createTopbarLayout, type TopbarActionId } from "./topbar.js";
 import { listRunOutputEntries } from "./runOutput.js";
 import { formatValidationIssues, parseWorkflowYaml, suggestWorkflowFileName } from "./workflowFiles.js";
@@ -822,7 +823,7 @@ function Inspector({ state, step, locale, t, setState }: { state: EditorState; s
   );
 }
 
-function LlmSelectionEditor({ state, step, t, setState }: {
+export function LlmSelectionEditor({ state, step, t, setState }: {
   state: EditorState;
   step: WorkflowStep;
   t: Translator;
@@ -848,6 +849,7 @@ function LlmSelectionEditor({ state, step, t, setState }: {
   const selectedModelValue = selection.explicitModelId ?? "";
   const hasInvalidProvider = Boolean(explicitProviderId) && providerOptions.every((provider) => provider.id !== explicitProviderId);
   const hasInvalidModel = Boolean(selectedModelValue) && activeModels.every((model) => model.id !== selectedModelValue);
+  const providerSelectionDisabled = isLlmProviderSelectionDisabled(step);
 
   return (
     <>
@@ -855,7 +857,7 @@ function LlmSelectionEditor({ state, step, t, setState }: {
       <div className="llm-selection-grid">
         <label>
           <span>{t("llm.provider")}</span>
-          <select value={providerValue} onChange={(event) => setState((current) => setStepLlmProvider(current, step.id, event.target.value))}>
+          <select value={providerValue} disabled={providerSelectionDisabled} onChange={(event) => setState((current) => setStepLlmProvider(current, step.id, event.target.value))}>
             <option value="">{defaultLabel}</option>
             {providerOptions.map((provider) => <option key={provider.id} value={provider.id}>{provider.label} ({provider.id})</option>)}
             {hasInvalidProvider && <option value={explicitProviderId}>{t("llm.selectionInvalid", { value: explicitProviderId })}</option>}
@@ -865,7 +867,7 @@ function LlmSelectionEditor({ state, step, t, setState }: {
           <span>{t("llm.model")}</span>
           <select
             value={selectedModelValue}
-            disabled={!explicitProviderId}
+            disabled={providerSelectionDisabled || !explicitProviderId}
             onChange={(event) => setState((current) => setStepLlmModel(current, step.id, event.target.value))}
           >
             {!explicitProviderId ? (
@@ -1218,4 +1220,5 @@ function clampModel(value: number, max: number): number {
   return Math.min(Math.max(value, 0), max);
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+const rootElement = document.getElementById("root");
+if (rootElement) createRoot(rootElement).render(<App />);
